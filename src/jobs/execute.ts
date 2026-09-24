@@ -5,7 +5,7 @@ import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { expectedReturn } from "@/strategy/sizing.ts";
-import { escapeHtml, money, pct } from "@/telegram/format.ts";
+import { escapeHtml, failureMessage, money, pct } from "@/telegram/format.ts";
 import { clearButtons, notify } from "@/telegram/notify.ts";
 
 const skip = async (bet: Bet, reason: string) => {
@@ -68,7 +68,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     // an order error is not retried: it's safer to miss a bet than to place it twice
     await updateBet(bet.id, { status: "failed", error: errorMessage(error) });
     await clearButtons(bet.telegramMessageId);
-    await notify(`⚠️ Could not place <b>${escapeHtml(bet.eventTitle)}</b>\n<code>${escapeHtml(errorMessage(error).slice(0, 300))}</code>`);
+    await notify(failureMessage(`Could not place: ${bet.eventTitle} → ${bet.outcomeLabel}`, error));
     log.error("bet failed", { betId: bet.id, error: errorMessage(error) });
   }
 };
