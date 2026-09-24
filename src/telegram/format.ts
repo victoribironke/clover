@@ -8,7 +8,9 @@ export const escapeHtml = (text: string) =>
 const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 export const money = (amount: number) => naira.format(amount);
 
-export const pct = (value: number, signed = false) => {
+export const usd = (amount: number) => `$${amount.toFixed(amount < 1 ? 3 : 2)}`;
+
+export const pct =(value: number, signed = false) => {
   const text = `${(value * 100).toFixed(1)}%`;
   return signed && value > 0 ? `+${text}` : text;
 };
@@ -50,6 +52,7 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
     factors ? `\n<b>Key factors</b>\n${factors}` : null,
     sources ? `\n<b>Sources</b>\n${sources}` : null,
     "",
+    `<i>Research cost ${usd(research.costUsd)} · ${research.usage.searches} searches</i>`,
     `⏳ Places ${lagosTime(bet.executeAt)} WAT unless you cancel.`,
   ]
     .filter((line) => line !== null)
@@ -72,7 +75,9 @@ export const statusLine = (bet: Bet) => {
   return `${icon[bet.status]} ${escapeHtml(bet.eventTitle)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
 };
 
-export const bankrollMessage = (bankroll: Bankroll, paused: boolean) =>
+export type Spend = { today: number; month: number; dailyBudget: number };
+
+export const bankrollMessage = (bankroll: Bankroll, paused: boolean, spend: Spend) =>
   [
     `<b>Clover</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
     `Capital: ${money(bankroll.capital)}`,
@@ -81,4 +86,5 @@ export const bankrollMessage = (bankroll: Bankroll, paused: boolean) =>
     `Free to bet: ${money(bankroll.deployable)}`,
     `Realized P&L: ${money(bankroll.realizedPnl)}`,
     `Withdrawable profit: <b>${money(bankroll.withdrawable)}</b>`,
+    `Research spend: ${usd(spend.today)} today (budget ${usd(spend.dailyBudget)}) · ${usd(spend.month)} this month`,
   ].join("\n");
