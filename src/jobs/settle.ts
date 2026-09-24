@@ -17,7 +17,8 @@ export const runSettle = async (exchange: Exchange) => {
       for (const bet of bets) {
         const market = event.markets.find((item) => item.id === bet.marketId);
         const cancelled = event.status === "cancelled" || market?.status === "cancelled";
-        if (!cancelled && !market?.resolvedOutcomeId) continue;
+        const resolved = (market?.status === "resolved" || event.status === "resolved") && Boolean(market?.resolvedOutcomeId);
+        if (!cancelled && !resolved) continue;
 
         const shares = bet.shares ?? 0;
         const won = !cancelled && market?.resolvedOutcomeId === bet.outcomeId;
