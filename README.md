@@ -43,12 +43,12 @@ The bot starts in **paper-trading mode** (`dryRun: true`). Everything runs, and 
 1. **Billing:** make sure billing is enabled for `fl-clover`.
 2. **APIs:** in _APIs & Services → Library_, enable **Cloud Run Admin API**, **Artifact Registry API**, **Cloud Scheduler API** and **Cloud Firestore API**.
 3. **Firestore:** open _Firestore → Create database_. Choose **Native mode**, keep the ID `(default)`, and pick location `europe-west9` (or `eur3` if it isn't offered). No indexes are needed.
-4. **Artifact Registry:** open _Artifact Registry → Create repository_. Name it `clover`, choose format **Docker**, mode _Standard_, region **europe-west9**.
+4. **Artifact Registry:** nothing to do. The workflow creates the `clover` Docker repository in europe-west9 on its first run.
 5. **Service accounts:** in _IAM & Admin → Service Accounts_, create two:
    - **`clover-runtime`**, which the app runs as. Give it the role **Cloud Datastore User**.
    - **`github-deployer`**, which GitHub Actions uses. Give it these roles:
      - **Cloud Run Admin**
-     - **Artifact Registry Writer**
+     - **Artifact Registry Administrator** (so the workflow can create the repository)
      - **Cloud Scheduler Admin**
      - **Service Account User**
 
