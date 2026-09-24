@@ -62,17 +62,35 @@ type RawQuote = {
   completeFill?: boolean;
 };
 
+type RawOrder = {
+  id: string;
+  status: string;
+  amount: number;
+  price?: number;
+  avgFillPrice?: number;
+  quantity?: number;
+  createdAt?: string;
+};
+
 type RawOrderResponse = {
   engine: "AMM" | "CLOB";
-  order: {
-    id: string;
-    status: string;
-    amount: number;
-    price?: number;
-    avgFillPrice?: number;
-    quantity?: number;
-  };
+  order: RawOrder;
 };
+
+type RawOrdersPage = {
+  orders: RawOrder[];
+};
+
+const toPlacedOrder = (order: RawOrder): PlacedOrder => ({
+  id: order.id,
+  status: order.status,
+  amount: order.amount,
+  avgPrice: order.avgFillPrice || order.price || 0,
+  shares: order.quantity ?? 0,
+});
+
+// orders in these states never bought anything
+const DEAD_ORDER_STATUSES = new Set(["rejected", "cancelled", "expired"]);
 
 type RawAssets = {
   assets: { symbol: string; availableBalance: number }[];
@@ -187,14 +205,19 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
         body: { side: "BUY", outcomeId, amount, type: "MARKET", currency: CURRENCY, maxSlippage },
       },
     );
-    const placed: PlacedOrder = {
-      id: order.id,
-      status: order.status,
-      amount: order.amount,
-      avgPrice: order.avgFillPrice || order.price || 0,
-      shares: order.quantity ?? 0,
-    };
-    return placed;
+    return toPlacedOrder(order);
+  };
+
+  // https://docs.bayse.markets/api-reference/pm/list-orders
+  const findOrders: Exchange["findOrders"] = async ({ eventId, marketId, outcomeId, sinceIso }) => {
+    const { orders } = await http.request<RawOrdersPage>("GET", "/v1/pm/orders", {
+      auth: "read",
+      query: { side: "BUY", eventId, marketId, outcomeId, currency: CURRENCY, size: 50 },
+    });
+    return orders
+      .filter((order) => !DEAD_ORDER_STATUSES.has(order.status.toLowerCase()))
+      .filter((order) => !order.createdAt || Date.parse(order.createdAt) >= Date.parse(sinceIso))
+      .map(toPlacedOrder);
   };
 
   const getAvailableBalance = async () => {
@@ -210,6 +233,7 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     getEvent,
     quote,
     placeOrder,
+    findOrders,
     getAvailableBalance,
   };
 };
