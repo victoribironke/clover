@@ -1,17 +1,19 @@
 import { config } from "@/config.ts";
 import { getBet, listBets, updateBet } from "@/db/bets.ts";
 import { isPaused, setPaused } from "@/db/kv.ts";
+import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScan } from "@/jobs/scan.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { bot } from "./bot.ts";
 import { bankrollMessage, escapeHtml, statusLine } from "./format.ts";
 import { notify } from "./notify.ts";
 
 const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
-Every bet is announced first. You have ${config.CANCEL_WINDOW_MINUTES} minutes to cancel it before it's placed.
+Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.
 
 /status: bankroll and profit
 /bets: pending and open bets
@@ -23,8 +25,14 @@ export const registerHandlers = () => {
   bot.command(["start", "help"], (ctx) => ctx.reply(HELP, { parse_mode: "HTML" }));
 
   bot.command("status", async (ctx) => {
-    const [bankroll, paused] = await Promise.all([getBankroll(exchange), isPaused()]);
-    await ctx.reply(bankrollMessage(bankroll, paused), { parse_mode: "HTML" });
+    const [bankroll, paused, today, month] = await Promise.all([
+      getBankroll(exchange),
+      isPaused(),
+      spendToday(),
+      spendThisMonth(),
+    ]);
+    const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
+    await ctx.reply(bankrollMessage(bankroll, paused, spend), { parse_mode: "HTML" });
   });
 
   bot.command("bets", async (ctx) => {
