@@ -74,12 +74,36 @@ const oneLineError = (error: unknown) => {
   return `${escapeHtml(source)}${code ? ` ${escapeHtml(code)}` : ""}: ${escapeHtml(message.slice(0, 160))}`;
 };
 
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+// ➖ Portugal vs Wales: Total Goals
+// Portugal have scored in 9 straight home games…
+// Closest: Over 2.5 goals → Yes · Gemini 58% (medium) vs market 49%
+// counted as 53.5%, costs 52.1% → +2.7% · fees and price impact eat the edge
+const reviewedLines = ({ title, summary, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
+  const lines = [`${proposed ? "✅" : "➖"} <b>${escapeHtml(title)}</b>`, `<i>${escapeHtml(clip(summary, 180))}</i>`];
+  if (proposed) {
+    lines.push("Bet proposed, see above.");
+  } else if (nearMiss) {
+    const pick = nearMiss.marketTitle === title ? nearMiss.outcomeLabel : `${nearMiss.marketTitle} → ${nearMiss.outcomeLabel}`;
+    lines.push(
+      `Closest: ${escapeHtml(pick)} · Gemini ${pct(nearMiss.modelProbability)} (${nearMiss.confidence}) vs market ${pct(nearMiss.marketPrice)}`,
+      `counted as ${pct(nearMiss.probability)}, costs ${pct(nearMiss.price)} → ${pct(nearMiss.expectedReturn, true)} · ${escapeHtml(nearMiss.reason)}`,
+    );
+  } else {
+    lines.push("No market in a tradeable price range.");
+  }
+  return lines.join("\n");
+};
+
 export const scanReportMessage = (report: ScanReport) => {
   if (report.skippedReason) return `⏸ <b>Scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
   const lines = [
     `🔎 <b>Scan done</b>`,
     `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>`,
   ];
+  if (report.reviewed.length > 0) lines.push("", "📋 <b>Researched</b>");
+  for (const item of report.reviewed) lines.push("", reviewedLines(item));
   if (report.failed.length > 0) {
     lines.push("", `⚠️ <b>${report.failed.length} failed</b>`);
     for (const { title, error } of report.failed.slice(0, 5)) {
