@@ -3,6 +3,7 @@ import { dueBets, updateBet, type Bet } from "@/db/bets.ts";
 import { isPaused } from "@/db/kv.ts";
 import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { settings } from "@/settings.ts";
 import { expectedReturn } from "@/strategy/sizing.ts";
 import { escapeHtml, money, pct } from "@/telegram/format.ts";
 import { clearButtons, notify } from "@/telegram/notify.ts";
@@ -31,7 +32,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
       amount: bet.stake,
     });
     const edge = expectedReturn(bet.probability, quote.avgPrice);
-    if (edge < config.MIN_EDGE) {
+    if (edge < settings.minEdge) {
       return await skip(bet, `Price moved to ${pct(quote.avgPrice)}; expected return is now ${pct(edge, true)}.`);
     }
 
@@ -47,7 +48,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
           marketId: bet.marketId,
           outcomeId: bet.outcomeId,
           amount: bet.stake,
-          maxSlippage: config.MAX_SLIPPAGE,
+          maxSlippage: settings.maxSlippage,
         });
 
     await updateBet(bet.id, {
