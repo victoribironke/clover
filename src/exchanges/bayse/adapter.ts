@@ -11,7 +11,7 @@ import type {
 import { createBayseHttp, type BayseHttpOptions } from "./http.ts";
 
 // Raw API shapes: only the fields we read. See https://docs.bayse.markets/api-reference/pm/list-events
-type RawMarket = {
+export type RawMarket = {
   id: string;
   title: string;
   status: string;
@@ -109,13 +109,17 @@ const normalizeType = (type: string): MarketEvent["type"] => {
   return "single";
 };
 
-// Resolved markets expose either the winning outcome's id or its label
-const resolvedOutcomeId = (market: RawMarket) => {
-  const raw = market.resolvedOutcomeId ?? market.resolvedOutcome ?? null;
-  if (!raw) return null;
-  if (raw === market.outcome1Id || raw === market.outcome1Label) return market.outcome1Id;
-  if (raw === market.outcome2Id || raw === market.outcome2Label) return market.outcome2Id;
-  return raw;
+// Resolved markets (checked against live data 2026-09-24) carry `resolvedOutcomeId`, the
+// winning outcome's id, and `resolvedOutcome`: "YES" when outcome1 won, "NO" when outcome2
+// won, whatever the labels are (e.g. Up/Down). Anything unrecognised returns null, so the
+// bet stays open instead of being settled on a guess.
+export const resolvedOutcomeId = (market: RawMarket) => {
+  if (market.resolvedOutcomeId === market.outcome1Id) return market.outcome1Id;
+  if (market.resolvedOutcomeId === market.outcome2Id) return market.outcome2Id;
+  const side = market.resolvedOutcome?.toUpperCase();
+  if (side === "YES") return market.outcome1Id;
+  if (side === "NO") return market.outcome2Id;
+  return null;
 };
 
 const toMarket = (market: RawMarket): Market => {
