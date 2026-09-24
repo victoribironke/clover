@@ -5,7 +5,7 @@ A betting assistant for prediction markets. It scans [Bayse Markets](https://doc
 ## How it works
 
 ```
-every 3h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
+every 6h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -16,7 +16,7 @@ every 3h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Ge
 every 5m   tick ─► place due bets (re-quote first) ─► settle resolved bets ─► P&L to Telegram
 ```
 
-- **Short markets only.** It considers events that resolve within 12 hours (sports matches, match and player stats, daily finance, weather, social media counts), so bets settle the same day. Change `maxHoursToResolve` in `src/settings.ts` to widen it.
+- **Data-settled markets only.** It only bets on markets that settle on measurable public data: prices, exchange rates, temperatures, post and stream counts, chart positions, official statistics. Sports, politics, awards, reality TV and anything else decided by people is left out, first by category (`categories` in `src/settings.ts`) and then by the screening step. Markets must resolve within 7 days (`maxHoursToResolve`).
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
 - **Capital.** The bot only ever works with ₦10,000. Anything above that is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
@@ -65,7 +65,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 4. registers the Telegram webhook
 5. creates or updates the Cloud Scheduler jobs:
    - tick every 5 minutes
-   - scan every 3 hours
+   - scan every 6 hours (00:00, 06:00, 12:00, 18:00 WAT)
 
 Send `/status` to your bot to check it's alive.
 
