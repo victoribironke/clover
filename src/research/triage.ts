@@ -1,64 +1,52 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { config } from "@/config.ts";
+import { recordUsage } from "@/db/spend.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
 import { log } from "@/lib/logger.ts";
-import { anthropic } from "./anthropic.ts";
+import { generate } from "@/llm/gemini.ts";
+import { settings } from "@/settings.ts";
+import { isTradeable } from "./describe-event.ts";
 
-const TriageSchema = z.object({
-  picks: z.array(
-    z.object({
-      event_id: z.string(),
-      reason: z.string(),
-    }),
-  ),
-});
+const SYSTEM = `Pick prediction markets worth web research. Favor questions where public info (stats, polls, odds, schedules) can beat the crowd and mid-range prices. Skip noise (short-term crypto, coin flips) and unknowables. Reply with refs only, best first.`;
 
-const SYSTEM = `You pick which prediction markets are worth an expensive deep-dive research run.
-A deep dive searches the web for statistics, news and expert forecasts, then estimates probabilities.
-Prefer events where public information can plausibly give an edge over the crowd:
-sports with rich stats, elections with polling, scheduled announcements, measurable thresholds, events the crowd may be mispricing.
-Avoid events that are close to pure noise (very short-horizon crypto up/down, coin flips) or where nothing is knowable in advance.
-Where a market price is shown, an extreme price (near 0 or 1) is usually right; a mid-range price on a researchable question is more interesting.`;
-
-const summarize = (event: MarketEvent) => {
-  const prices = event.markets
-    .slice(0, 6)
-    .map((market) => `${market.title}: ${Math.round(market.outcomes[0].price * 100)}%`)
-    .join("; ");
-  const more = event.markets.length > 6 ? ` (+${event.markets.length - 6} more)` : "";
-  return `${event.id} | ${event.category} | closes ${event.closingDate ?? "n/a"} | vol ${Math.round(event.totalVolume)} | ${event.title} | ${prices}${more}`;
+const schema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["refs"],
+  properties: { refs: { type: "array", items: { type: "string" } } },
 };
 
-// One cheap call over the whole candidate list; returns event ids ranked best-first
+const parse = z.object({ refs: z.array(z.string()) });
+
+// e.g. "e4|SPORTS|09-27|Arsenal vs Chelsea: Winner|Arsenal 48,Draw 27,Chelsea 25"
+const line = (event: MarketEvent, index: number) => {
+  const prices = event.markets
+    .filter(isTradeable)
+    .slice(0, 3)
+    .map((market) => `${market.title.slice(0, 30)} ${Math.round(market.outcomes[0].price * 100)}`)
+    .join(",");
+  return `e${index + 1}|${event.category}|${event.closingDate?.slice(5, 10) ?? "-"}|${event.title.slice(0, 90)}|${prices}`;
+};
+
+// One cheap call (no web search) over the whole candidate list; returns event ids, best first
 export const triageEvents = async (events: MarketEvent[], limit: number) => {
   if (events.length === 0 || limit === 0) return [];
   if (events.length <= limit) return events.map((event) => event.id);
 
-  const response = await anthropic.messages.parse({
-    model: config.TRIAGE_MODEL,
-    max_tokens: 8000,
-    output_config: { effort: "low", format: zodOutputFormat(TriageSchema) },
+  const result = await generate({
     system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Today is ${new Date().toISOString().slice(0, 10)}.
-Pick up to ${limit} events worth researching, best first. Use the exact event ids.
-
-id | category | closes | volume | title | outcome1 prices
-${events.map(summarize).join("\n")}`,
-      },
-    ],
+    prompt: `Today ${new Date().toISOString().slice(0, 10)}. Pick up to ${limit}.\nref|category|closes|title|prices(%)\n${events.map(line).join("\n")}`,
+    jsonSchema: schema,
+    parse,
+    webSearch: false,
+    maxOutputTokens: 1500,
   });
+  const costUsd = await recordUsage(result.usage);
 
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    log.warn("triage returned nothing", { stopReason: response.stop_reason });
-    return [];
-  }
-
-  const known = new Set(events.map((event) => event.id));
-  const picks = response.parsed_output.picks.filter((pick) => known.has(pick.event_id)).slice(0, limit);
-  log.info("triage picks", { picks });
-  return picks.map((pick) => pick.event_id);
+  const picks = result.data.refs
+    .map((ref) => events[Number(ref.replace(/^e/, "")) - 1]?.id)
+    .filter((id): id is string => Boolean(id));
+  const unique = [...new Set(picks)].slice(0, limit);
+  log.info("triage", { picks: unique.length, usage: result.usage, costUsd });
+  return unique;
 };
