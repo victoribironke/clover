@@ -5,7 +5,7 @@ import type { MarketEvent } from "@/exchanges/types.ts";
 import { log } from "@/lib/logger.ts";
 import { generate } from "@/llm/gemini.ts";
 import { settings } from "@/settings.ts";
-import { isTradeable } from "./describe-event.ts";
+import { isTradeable, nowUtc } from "./describe-event.ts";
 
 const SYSTEM = `Pick prediction markets worth web research. Favor questions where public info (stats, polls, odds, schedules) can beat the crowd and mid-range prices. Skip noise (short-term crypto, coin flips) and unknowables. Reply with refs only, best first.`;
 
@@ -25,7 +25,7 @@ const line = (event: MarketEvent, index: number) => {
     .slice(0, 3)
     .map((market) => `${market.title.slice(0, 30)} ${Math.round(market.outcomes[0].price * 100)}`)
     .join(",");
-  return `e${index + 1}|${event.category}|${event.closingDate?.slice(5, 10) ?? "-"}|${event.title.slice(0, 90)}|${prices}`;
+  return `e${index + 1}|${event.category}|${(event.resolutionDate ?? event.closingDate)?.slice(11, 16) ?? "-"}|${event.title.slice(0, 90)}|${prices}`;
 };
 
 // One cheap call (no web search) over the whole candidate list; returns event ids, best first
@@ -35,7 +35,7 @@ export const triageEvents = async (events: MarketEvent[], limit: number) => {
 
   const result = await generate({
     system: SYSTEM,
-    prompt: `Today ${new Date().toISOString().slice(0, 10)}. Pick up to ${limit}.\nref|category|closes|title|prices(%)\n${events.map(line).join("\n")}`,
+    prompt: `Now ${nowUtc()}. All events resolve within hours. Pick up to ${limit}.\nref|category|resolves(UTC)|title|prices(%)\n${events.map(line).join("\n")}`,
     jsonSchema: schema,
     parse,
     webSearch: false,
