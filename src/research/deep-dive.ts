@@ -26,8 +26,8 @@ export type DeepDive = {
 
 // Kept short on purpose: every token here is paid on every deep dive
 const SYSTEM = `You are a calibrated forecaster for a Nigerian prediction market.
-Search the web (at most 4 searches) for recent stats, form, polls, bookmaker/exchange odds, and news, then estimate each market's outcome1 probability.
-Resolution rules decide the answer, not the headline. Start from base rates. Bookmaker odds are strong evidence.
+These markets settle on measurable data. Search the web (at most 4 searches) for the latest value of the measured quantity, its recent trend and typical movement, and any forecast or scheduled release, then estimate each market's outcome1 probability.
+Reason from the numbers: how far the latest value is from each threshold, and how likely it is to cross in the time left. Resolution rules and the named source decide the answer, not the headline.
 Thin evidence: stay near the base rate, confidence "low". Use "high" only when hard recent data settles it.
 Mutually exclusive markets: probabilities should sum to about 1 minus the unlisted long shots.
 Be brief: summary max 60 words, max 3 factors of max 15 words each.`;
