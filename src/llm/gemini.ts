@@ -1,9 +1,19 @@
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { config } from "@/config.ts";
 import { settings } from "@/settings.ts";
 import type { Source, StructuredRequest, StructuredResult } from "./types.ts";
 
-const ai = new GoogleGenAI({ apiKey: config.GEMINI_API_KEY });
+// The SDK only retries when retryOptions is set. It then retries 408/429/500/502/503/504
+// with exponential backoff and jitter: here about 3s, 6s, 12s, 24s between the 5 attempts.
+// Failed attempts aren't billed.
+const ai = new GoogleGenAI({
+  apiKey: config.GEMINI_API_KEY,
+  httpOptions: { retryOptions: { attempts: 5, initialDelay: 3, maxDelay: 30 } },
+});
+
+// After retries: Gemini itself is down or out of quota, so there's no point trying the next event
+export const isGeminiUnavailable = (error: unknown) =>
+  error instanceof ApiError && [429, 500, 502, 503, 504].includes(error.status);
 
 export const generate = async <T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> => {
   const response = await ai.models.generateContent({
