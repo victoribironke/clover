@@ -7,7 +7,7 @@ import { generate } from "@/llm/gemini.ts";
 import { recordUsage } from "@/db/spend.ts";
 import type { Source, Usage } from "@/llm/types.ts";
 import { settings } from "@/settings.ts";
-import { describeEvent } from "./describe-event.ts";
+import { describeEvent, nowUtc } from "./describe-event.ts";
 
 export type Estimate = {
   marketId: string;
@@ -65,7 +65,7 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
   const { text, marketIdByRef } = describeEvent(event);
   const result = await generate({
     system: SYSTEM,
-    prompt: `Today ${new Date().toISOString().slice(0, 10)}.\n${text}`,
+    prompt: `Now ${nowUtc()}.\n${text}`,
     jsonSchema: schema,
     parse,
     webSearch: true,
