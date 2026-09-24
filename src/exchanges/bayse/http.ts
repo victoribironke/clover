@@ -34,6 +34,7 @@ export const signRequest = (
 };
 
 const MAX_ATTEMPTS = 4;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,6 +66,7 @@ export const createBayseHttp = (options: BayseHttpOptions) => {
         method,
         headers,
         body: bodyText ?? undefined,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
       const retryable = response.status === 429 || response.status >= 500;
