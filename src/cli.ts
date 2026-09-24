@@ -3,7 +3,7 @@
 //   bun run scan     - run one full scan (LLM research + proposals to Telegram)
 //   bun run tick     - place due bets and settle resolved ones
 import { exchange } from "@/exchanges/index.ts";
-import { eligibleEvents, runScan } from "@/jobs/scan.ts";
+import { eligibleEvents, runScanAndReport } from "@/jobs/scan.ts";
 import { runTick } from "@/jobs/tick.ts";
 
 const commands: Record<string, () => Promise<unknown>> = {
@@ -18,7 +18,7 @@ const commands: Record<string, () => Promise<unknown>> = {
     }
     return { open: events.length, eligible: eligible.length };
   },
-  scan: () => runScan(exchange, { force: true }),
+  scan: () => runScanAndReport(exchange, { force: true, announce: true }),
   tick: () => runTick(exchange),
 };
 
