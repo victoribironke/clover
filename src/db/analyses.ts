@@ -1,6 +1,6 @@
 import type { ExchangeName } from "@/exchanges/types.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
-import { db } from "./client.ts";
+import { collection } from "./firestore.ts";
 
 export const saveAnalysis = async (
   exchange: ExchangeName,
@@ -9,29 +9,20 @@ export const saveAnalysis = async (
   model: string,
   deepDive: DeepDive,
 ) => {
-  const result = await db.execute({
-    sql: `INSERT INTO analyses (exchange, event_id, event_title, model, summary, key_factors_json, sources_json, estimates_json, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      exchange,
-      eventId,
-      eventTitle,
-      model,
-      deepDive.summary,
-      JSON.stringify(deepDive.keyFactors),
-      JSON.stringify(deepDive.sources),
-      JSON.stringify(deepDive.estimates),
-      new Date().toISOString(),
-    ],
+  const ref = await collection("analyses").add({
+    exchange,
+    eventId,
+    eventTitle,
+    model,
+    ...deepDive,
+    createdAt: new Date().toISOString(),
   });
-  return Number(result.lastInsertRowid);
+  return ref.id;
 };
 
-// Event ids researched since `sinceIso`, so a scan doesn't pay for the same deep dive twice
+// Event ids researched since `sinceIso`, so a scan doesn't pay for the same deep dive twice.
+// Single-field range query only, so Firestore needs no composite index.
 export const recentlyAnalyzedEventIds = async (exchange: ExchangeName, sinceIso: string) => {
-  const result = await db.execute({
-    sql: "SELECT DISTINCT event_id FROM analyses WHERE exchange = ? AND created_at >= ?",
-    args: [exchange, sinceIso],
-  });
-  return new Set(result.rows.map((row) => row.event_id as string));
+  const snapshot = await collection("analyses").where("createdAt", ">=", sinceIso).select("exchange", "eventId").get();
+  return new Set(snapshot.docs.filter((doc) => doc.get("exchange") === exchange).map((doc) => doc.get("eventId") as string));
 };
