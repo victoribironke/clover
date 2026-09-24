@@ -1,36 +1,48 @@
-import type { MarketEvent } from "@/exchanges/types.ts";
+import type { Market, MarketEvent } from "@/exchanges/types.ts";
 
-const TYPE_NOTE: Record<MarketEvent["type"], string> = {
-  single: "Single binary market.",
-  combined: "Mutually exclusive markets: exactly one market resolves YES, the rest resolve NO.",
-  grouped: "Independent markets: each resolves on its own.",
+// Markets priced outside this band are never bet on, so they're not worth research tokens
+const MIN_PRICE = 0.03;
+const MAX_PRICE = 0.97;
+
+export const isTradeable = (market: Market) =>
+  market.status === "open" && market.outcomes.some((outcome) => outcome.price >= MIN_PRICE && outcome.price <= MAX_PRICE);
+
+const clip = (text: string, max: number) => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 };
 
-// Plain-text description of an event for the research model. Market prices are
-// deliberately left out so the model forms an independent estimate instead of
-// anchoring on the crowd; the sizing step blends the two afterwards.
-export const describeEvent = (event: MarketEvent) => {
+export type DescribedEvent = {
+  text: string;
+  // short refs ("m1", "m2", …) cost far fewer tokens than UUIDs, in and out
+  marketIdByRef: Map<string, string>;
+};
+
+// Compact plain-text brief for the research model. Prices are left out on
+// purpose so the model forms its own estimate; sizing blends the two later.
+export const describeEvent = (event: MarketEvent): DescribedEvent => {
+  const markets = event.markets.filter(isTradeable);
+  const marketIdByRef = new Map(markets.map((market, index) => [`m${index + 1}`, market.id]));
+  const omitted = event.markets.length - markets.length;
+
+  // rules repeat across the markets of one event, so print each distinct text once
+  const sharedRules = new Set(markets.map((market) => market.rules)).size === 1 ? markets[0]?.rules : undefined;
+
   const lines = [
     `Event: ${event.title}`,
-    `Category: ${event.category}`,
-    `Structure: ${TYPE_NOTE[event.type]}`,
-    event.closingDate && `Trading closes: ${event.closingDate}`,
-    event.resolutionDate && `Resolves: ${event.resolutionDate}`,
-    event.resolutionSource && `Resolution source: ${event.resolutionSource}`,
-    event.description && `Description: ${event.description}`,
-    event.additionalContext && `Additional context: ${event.additionalContext}`,
-    "",
-    "Markets:",
-    ...event.markets.map((market) =>
-      [
-        `- market_id: ${market.id}`,
-        `  question: ${market.title}`,
-        `  outcome1: ${market.outcomes[0].label}, outcome2: ${market.outcomes[1].label}`,
-        market.rules && `  rules: ${market.rules.replace(/\s+/g, " ").trim()}`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    ),
+    event.closingDate && `Closes: ${event.closingDate.slice(0, 16)}`,
+    event.resolutionSource && `Source: ${clip(event.resolutionSource, 150)}`,
+    // descriptions often repeat the rules verbatim
+    event.description && clip(event.description, 500) !== clip(sharedRules ?? "", 500) && `Info: ${clip(event.description, 400)}`,
+    event.type === "combined" &&
+      `Mutually exclusive: one market resolves YES.${omitted ? ` ${omitted} long-shot options not listed.` : ""}`,
+    sharedRules && `Rules: ${clip(sharedRules, 500)}`,
+    "Markets (outcome1/outcome2):",
+    ...markets.map((market, index) => {
+      const rules = !sharedRules && market.rules ? ` | rules: ${clip(market.rules, 250)}` : "";
+      return `m${index + 1}: ${market.title} (${market.outcomes[0].label}/${market.outcomes[1].label})${rules}`;
+    }),
   ];
-  return lines.filter((line): line is string => typeof line === "string").join("\n");
+
+  return { text: lines.filter((line): line is string => typeof line === "string").join("\n"), marketIdByRef };
 };
