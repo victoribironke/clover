@@ -13,8 +13,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
-    "@libsql/client": "^0.18.0",
+    "@google-cloud/firestore": "^9.2.0",
+    "@google/genai": "^2.24.0",
     "grammy": "^1.46.0",
     "zod": "^4.6.5"
   },
