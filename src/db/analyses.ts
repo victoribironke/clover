@@ -1,5 +1,6 @@
 import type { ExchangeName } from "@/exchanges/types.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
+import type { NearMiss } from "@/strategy/propose.ts";
 import { collection } from "./firestore.ts";
 
 export const saveAnalysis = async (
@@ -8,6 +9,7 @@ export const saveAnalysis = async (
   eventTitle: string,
   model: string,
   deepDive: DeepDive,
+  verdict: { proposed: boolean; nearMiss: NearMiss | null },
 ) => {
   const ref = await collection("analyses").add({
     exchange,
@@ -15,6 +17,7 @@ export const saveAnalysis = async (
     eventTitle,
     model,
     ...deepDive,
+    ...verdict,
     createdAt: new Date().toISOString(),
   });
   return ref.id;
