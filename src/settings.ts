@@ -24,17 +24,22 @@ export const settings = {
   // hard cap on estimated Gemini spend per UTC day, in USD
   dailyResearchBudgetUsd: 0.25,
   maxDeepDivesPerScan: 4,
-  // don't re-research an event within this window (longer than any event we consider lasts)
+  // don't re-research an event within this window; prices and data move, so re-check daily
   researchCooldownHours: 24,
-  // only consider events that resolve within this many hours, so money comes back the same day
-  maxHoursToResolve: 12,
+  // Only markets that settle on measurable public data (prices, rates, temperatures, counts,
+  // charts, official statistics). Categories are a first cut: screening then drops any event
+  // in them that's decided by a person's choice or performance. Sports, politics, awards,
+  // reality TV, culture and tech deals are left out. Names are matched uppercase.
+  categories: ["CRYPTO", "FINANCE", "ECONOMY", "ECONOMICS", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS"],
+  // only consider events that resolve within this many hours (7 days), so capital isn't tied up for long
+  maxHoursToResolve: 168,
   // trading must stay open at least this long: the cancel window plus a margin to place the bet
   minMinutesBeforeClose: 60,
 
   // --- Schedule when running locally ---
   // (on Cloud Run, Cloud Scheduler drives these; see .github/workflows/deploy-cloudrun.yml)
-  // short-lived markets come and go, so scan more often; the daily budget still caps spend
-  scanEveryMinutes: 180,
+  // 4 scans a day; the daily budget still caps spend
+  scanEveryMinutes: 360,
   tickEveryMinutes: 1,
 
   bayseBaseUrl: "https://relay.bayse.markets",
