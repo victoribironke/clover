@@ -1,4 +1,5 @@
 import { config } from "@/config.ts";
+import { releaseHeldLocks } from "@/db/kv.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runTick } from "@/jobs/tick.ts";
@@ -7,6 +8,7 @@ import { startServer } from "@/server.ts";
 import { settings } from "@/settings.ts";
 import { bot } from "@/telegram/bot.ts";
 import { registerHandlers } from "@/telegram/handlers.ts";
+import { notify } from "@/telegram/notify.ts";
 
 const every = (minutes: number, name: string, job: () => Promise<unknown>) => {
   const run = () =>
@@ -17,7 +19,24 @@ const every = (minutes: number, name: string, job: () => Promise<unknown>) => {
   return run;
 };
 
+// Cloud Run sends SIGTERM (then ~10s grace) when it replaces or recycles an instance, e.g. on
+// every deploy. Work in progress dies with the process, so hand back its locks and say so,
+// instead of leaving a stale lock that blocks the next scan.
+const shutdown = async (signal: string) => {
+  log.warn("shutting down", { signal });
+  try {
+    const released = await releaseHeldLocks();
+    if (released.includes("scan")) {
+      await notify("⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.");
+    }
+  } finally {
+    process.exit(0);
+  }
+};
+
 const main = async () => {
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => void shutdown("SIGINT"));
   registerHandlers();
   const server = startServer();
   log.info("server listening", { port: server.port, cloudRun: config.onCloudRun, dryRun: settings.dryRun });
