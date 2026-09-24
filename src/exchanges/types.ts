@@ -74,6 +74,14 @@ export type PlacedOrder = {
   shares: number;
 };
 
+export type OrderQuery = {
+  eventId: string;
+  marketId: string;
+  outcomeId: string;
+  // only orders created at or after this time
+  sinceIso: string;
+};
+
 export type Exchange = {
   name: ExchangeName;
   currency: Currency;
@@ -83,5 +91,7 @@ export type Exchange = {
   getEvent: (eventId: string) => Promise<MarketEvent>;
   quote: (request: QuoteRequest) => Promise<Quote>;
   placeOrder: (request: OrderRequest) => Promise<PlacedOrder>;
+  // our BUY orders that actually bought something (filled, partly filled, or resting on the book)
+  findOrders: (query: OrderQuery) => Promise<PlacedOrder[]>;
   getAvailableBalance: () => Promise<number>;
 };
