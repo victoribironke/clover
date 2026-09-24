@@ -1,4 +1,6 @@
 import type { Bet } from "@/db/bets.ts";
+import type { ScanReport } from "@/jobs/scan.ts";
+import { describeError } from "@/lib/errors.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
 import type { Bankroll } from "@/strategy/bankroll.ts";
 
@@ -57,6 +59,34 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
   ]
     .filter((line) => line !== null)
     .join("\n");
+};
+
+// ⚠️ Scan failed
+// Gemini · 400 INVALID_ARGUMENT
+// Thinking level MINIMAL is not supported for this model.
+export const failureMessage = (title: string, error: unknown) => {
+  const { source, code, message } = describeError(error);
+  return `⚠️ <b>${escapeHtml(title)}</b>\n${escapeHtml(source)}${code ? ` · <code>${escapeHtml(code)}</code>` : ""}\n<i>${escapeHtml(message.slice(0, 500))}</i>`;
+};
+
+const oneLineError = (error: unknown) => {
+  const { source, code, message } = describeError(error);
+  return `${escapeHtml(source)}${code ? ` ${escapeHtml(code)}` : ""}: ${escapeHtml(message.slice(0, 160))}`;
+};
+
+export const scanReportMessage = (report: ScanReport) => {
+  if (report.skippedReason) return `⏸ <b>Scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
+  const lines = [
+    `🔎 <b>Scan done</b>`,
+    `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>`,
+  ];
+  if (report.failed.length > 0) {
+    lines.push("", `⚠️ <b>${report.failed.length} failed</b>`);
+    for (const { title, error } of report.failed.slice(0, 5)) {
+      lines.push(`• ${escapeHtml(title)}\n  <i>${oneLineError(error)}</i>`);
+    }
+  }
+  return lines.join("\n");
 };
 
 export const statusLine = (bet: Bet) => {
