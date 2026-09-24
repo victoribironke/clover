@@ -10,7 +10,7 @@ import { triageEvents } from "@/research/triage.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
-import { proposeBet } from "@/strategy/propose.ts";
+import { proposeBet, type NearMiss } from "@/strategy/propose.ts";
 import { failureMessage, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
 import { betKeyboard, notify } from "@/telegram/notify.ts";
 
@@ -21,6 +21,8 @@ export type ScanReport = {
   eligible: number;
   researched: number;
   proposed: number;
+  // what each deep dive concluded, bet or not
+  reviewed: { title: string; summary: string; proposed: boolean; nearMiss: NearMiss | null }[];
   // events whose research or pricing threw; the scan carries on without them
   failed: { title: string; error: unknown }[];
   skippedReason?: string;
@@ -31,6 +33,7 @@ const skipped = (skippedReason: string): ScanReport => ({
   eligible: 0,
   researched: 0,
   proposed: 0,
+  reviewed: [],
   failed: [],
   skippedReason,
 });
@@ -62,27 +65,31 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
 
     let researched = 0;
     const failed: ScanReport["failed"] = [];
+    const reviewed: ScanReport["reviewed"] = [];
     let proposed = 0;
     for (const eventId of picked) {
       if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
         log.warn("daily research budget reached", { budget: settings.dailyResearchBudgetUsd });
         break;
       }
+      // earlier proposals in this scan may have used up the capital; don't pay for research we can't bet on
+      if ((await getBankroll(exchange)).deployable <= 0) break;
       const event = eligible.find((item) => item.id === eventId)!;
       try {
         const research = await deepDive(event);
         researched++;
-        const analysisId = await saveAnalysis(exchange.name, event.id, event.title, settings.model, research);
-
-        // refresh: earlier proposals in this scan used up capital
         const current = await getBankroll(exchange);
-        if (current.deployable <= 0) break;
 
         // re-read prices: research can take minutes and the market may have moved
         const fresh = await exchange.getEvent(event.id);
-        const proposal = await proposeBet(exchange, fresh, research.estimates, current);
+        const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current);
+        const analysisId = await saveAnalysis(exchange.name, event.id, event.title, settings.model, research, {
+          proposed: Boolean(proposal),
+          nearMiss,
+        });
+        reviewed.push({ title: event.title, summary: research.summary, proposed: Boolean(proposal), nearMiss });
         if (!proposal) {
-          log.info("no edge", { eventId: event.id, title: event.title });
+          log.info("no edge", { eventId: event.id, title: event.title, nearMiss });
           continue;
         }
 
@@ -117,7 +124,7 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
       }
     }
 
-    return { open: events.length, eligible: eligible.length, researched, proposed, failed };
+    return { open: events.length, eligible: eligible.length, researched, proposed, reviewed, failed };
   } finally {
     await releaseLock("scan");
   }
