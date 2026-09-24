@@ -1,0 +1,113 @@
+# .github/workflows/deploy-cloudrun.yml
+
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - "Dockerfile"
+      - ".github/workflows/deploy-cloudrun.yml"
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: fl-clover
+  SERVICE_NAME: clover
+  REGION: europe-west9
+  # Artifact Registry Docker repository, created once in the console (see README)
+  REPOSITORY: clover
+  # Cloud Scheduler has its own region list; europe-west1 supports it and can call any region
+  SCHEDULER_REGION: europe-west1
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH # Add Bun to PATH
+
+      # A bot that moves money shouldn't ship with failing tests or type errors
+      - name: Typecheck and test
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun test
+
+      - name: Docker Login to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Build and Push Docker image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Authenticate Google Cloud CLI
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      # --max-instances=1: one bot, no racing instances
+      # --no-cpu-throttling: a /scan started from Telegram keeps running after the webhook replies
+      # --timeout=3600: scans run research and can take many minutes
+      # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET
+      # --service-account: runs as clover-runtime, which only has Firestore access
+      # Only secrets go here; every other setting lives in src/settings.ts
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: --allow-unauthenticated --max-instances=1 --no-cpu-throttling --timeout=3600 --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          env_vars_update_strategy: overwrite
+          env_vars: |-
+            BAYSE_PUBLIC_KEY=${{ secrets.BAYSE_PUBLIC_KEY }}
+            BAYSE_SECRET_KEY=${{ secrets.BAYSE_SECRET_KEY }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
+            APP_SECRET=${{ secrets.APP_SECRET }}
+
+      - name: Set Telegram Webhook
+        run: |
+          curl -fsS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d '{"url": "${{ steps.deploy.outputs.url }}/telegram", "secret_token": "${{ secrets.APP_SECRET }}"}'
+
+      # Create the two scheduler jobs on the first deploy, keep them pointed at the service afterwards.
+      # Scan every 6h matches settings.scanEveryMinutes (used when running locally).
+      - name: Configure Cloud Scheduler
+        run: |
+          upsert() {
+            name="$1"; schedule="$2"; path="$3"; deadline="$4"
+            args=(--location="${{ env.SCHEDULER_REGION }}" --schedule="$schedule" --time-zone="Africa/Lagos"
+                  --uri="${{ steps.deploy.outputs.url }}$path" --http-method=POST
+                  --attempt-deadline="$deadline" --project="${{ env.PROJECT_ID }}")
+            if gcloud scheduler jobs describe "$name" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+              gcloud scheduler jobs update http "$name" "${args[@]}" --update-headers="Authorization=Bearer ${{ secrets.APP_SECRET }}"
+            else
+              gcloud scheduler jobs create http "$name" "${args[@]}" --headers="Authorization=Bearer ${{ secrets.APP_SECRET }}"
+            fi
+          }
+          upsert clover-tick "*/5 * * * *" /jobs/tick 600s
+          upsert clover-scan "0 */6 * * *" /jobs/scan 1800s
