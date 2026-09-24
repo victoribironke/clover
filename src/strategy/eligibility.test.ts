@@ -13,7 +13,7 @@ const event = (overrides: Partial<MarketEvent>): MarketEvent => ({
   description: "",
   additionalContext: "",
   resolutionSource: "",
-  category: "SPORTS",
+  category: "FINANCE",
   type: "single",
   engine: "AMM",
   status: "open",
@@ -58,6 +58,19 @@ describe("eligibleEvents", () => {
   });
   test("drops long-running events with no dates", () => {
     expect(passes({})).toBe(false);
+  });
+  test("keeps an event that resolves within the week", () => {
+    expect(passes({ resolutionDate: inHours(24 * 5) })).toBe(true);
+  });
+  test("drops categories decided by people rather than data", () => {
+    for (const category of ["SPORTS", "PLAYER STATS", "POLITICS", "HEADIES", "BB NAIJA"]) {
+      expect(passes({ category, resolutionDate: inHours(5) })).toBe(false);
+    }
+  });
+  test("keeps data-driven categories", () => {
+    for (const category of ["CRYPTO", "FINANCE", "ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS"]) {
+      expect(passes({ category, resolutionDate: inHours(5) })).toBe(true);
+    }
   });
   test("drops events without NGN trading", () => {
     expect(passes({ resolutionDate: inHours(5), supportedCurrencies: ["USD"] })).toBe(false);
