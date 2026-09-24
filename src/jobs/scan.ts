@@ -2,10 +2,12 @@ import { config } from "@/config.ts";
 import { recentlyAnalyzedEventIds, saveAnalysis } from "@/db/analyses.ts";
 import { activeBetEventIds, createBet, updateBet } from "@/db/bets.ts";
 import { isPaused, releaseLock, tryLock } from "@/db/kv.ts";
+import { spendToday } from "@/db/spend.ts";
 import type { Exchange, MarketEvent } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { deepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
+import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { proposeBet } from "@/strategy/propose.ts";
 import { proposalMessage } from "@/telegram/format.ts";
@@ -31,7 +33,7 @@ export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now 
     // no closing date: long-running markets like "who wins the 2027 election"; keep them
     if (!event.closingDate) return true;
     const untilClose = new Date(event.closingDate).getTime() - now;
-    return untilClose >= config.MIN_HOURS_TO_CLOSE * HOUR && untilClose <= config.MAX_DAYS_TO_CLOSE * DAY;
+    return untilClose >= settings.minHoursToClose * HOUR && untilClose <= settings.maxDaysToClose * DAY;
   });
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
@@ -45,25 +47,32 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
     if (bankroll.deployable <= 0) {
       return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "no free capital" };
     }
+    if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
+      return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "daily research budget reached" };
+    }
 
-    const cooldownSince = new Date(Date.now() - config.RESEARCH_COOLDOWN_HOURS * HOUR).toISOString();
+    const cooldownSince = new Date(Date.now() - settings.researchCooldownHours * HOUR).toISOString();
     const [events, recent, active] = await Promise.all([
       exchange.listOpenEvents(),
       recentlyAnalyzedEventIds(exchange.name, cooldownSince),
       activeBetEventIds(exchange.name),
     ]);
     const eligible = eligibleEvents(events, new Set([...recent, ...active]));
-    const picked = await triageEvents(eligible, config.MAX_DEEP_DIVES_PER_SCAN);
+    const picked = await triageEvents(eligible, settings.maxDeepDivesPerScan);
     log.info("scan", { open: events.length, eligible: eligible.length, picked: picked.length });
 
     let researched = 0;
     let proposed = 0;
     for (const eventId of picked) {
+      if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
+        log.warn("daily research budget reached", { budget: settings.dailyResearchBudgetUsd });
+        break;
+      }
       const event = eligible.find((item) => item.id === eventId)!;
       try {
         const research = await deepDive(event);
         researched++;
-        const analysisId = await saveAnalysis(exchange.name, event.id, event.title, config.RESEARCH_MODEL, research);
+        const analysisId = await saveAnalysis(exchange.name, event.id, event.title, settings.model, research);
 
         // refresh: earlier proposals in this scan used up capital
         const current = await getBankroll(exchange);
@@ -93,9 +102,9 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
           expectedReturn: proposal.expectedReturn,
           confidence: proposal.confidence,
           stake: proposal.stake,
-          rationale: proposal.reasoning,
-          dryRun: config.DRY_RUN,
-          executeAt: new Date(Date.now() + config.CANCEL_WINDOW_MINUTES * 60_000).toISOString(),
+          rationale: research.summary,
+          dryRun: settings.dryRun,
+          executeAt: new Date(Date.now() + settings.cancelWindowMinutes * 60_000).toISOString(),
         });
         const messageId = await notify(proposalMessage(bet, research), betKeyboard(bet.id));
         if (messageId) await updateBet(bet.id, { telegramMessageId: messageId });
