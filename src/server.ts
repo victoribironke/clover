@@ -1,7 +1,7 @@
 import { webhookCallback } from "grammy";
 import { config } from "@/config.ts";
 import { exchange } from "@/exchanges/index.ts";
-import { runScan } from "@/jobs/scan.ts";
+import { runScanAndReport } from "@/jobs/scan.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { bot } from "@/telegram/bot.ts";
@@ -38,7 +38,7 @@ export const startServer = () =>
       },
       "/jobs/scan": {
         POST: (request) =>
-          authorizedCron(request) ? runJob("scan", () => runScan(exchange)) : new Response("unauthorized", { status: 401 }),
+          authorizedCron(request) ? runJob("scan", () => runScanAndReport(exchange)) : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/tick": {
         POST: (request) =>
