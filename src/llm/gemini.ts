@@ -4,11 +4,12 @@ import { settings } from "@/settings.ts";
 import type { Source, StructuredRequest, StructuredResult } from "./types.ts";
 
 // The SDK only retries when retryOptions is set. It then retries 408/429/500/502/503/504
-// with exponential backoff and jitter: here about 3s, 6s, 12s, 24s between the 5 attempts.
-// Failed attempts aren't billed.
+// with exponential backoff and jitter: here about 3s, 6s, 12s between the 4 attempts.
+// Failed attempts aren't billed. Each attempt times out after 90s (a grounded deep dive
+// normally takes 10-40s), so one stuck request can't stall a scan.
 const ai = new GoogleGenAI({
   apiKey: config.GEMINI_API_KEY,
-  httpOptions: { retryOptions: { attempts: 5, initialDelay: 3, maxDelay: 30 } },
+  httpOptions: { timeout: 90_000, retryOptions: { attempts: 4, initialDelay: 3, maxDelay: 30 } },
 });
 
 // After retries: Gemini itself is down or out of quota, so there's no point trying the next event
