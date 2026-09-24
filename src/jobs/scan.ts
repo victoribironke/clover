@@ -10,7 +10,7 @@ import { triageEvents } from "@/research/triage.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { proposeBet } from "@/strategy/propose.ts";
-import { proposalMessage } from "@/telegram/format.ts";
+import { failureMessage, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
 import { betKeyboard, notify } from "@/telegram/notify.ts";
 
 const HOUR = 60 * 60 * 1000;
@@ -21,8 +21,19 @@ export type ScanReport = {
   eligible: number;
   researched: number;
   proposed: number;
+  // events whose research or pricing threw; the scan carries on without them
+  failed: { title: string; error: unknown }[];
   skippedReason?: string;
 };
+
+const skipped = (skippedReason: string): ScanReport => ({
+  open: 0,
+  eligible: 0,
+  researched: 0,
+  proposed: 0,
+  failed: [],
+  skippedReason,
+});
 
 // Cheap, deterministic filters before any money is spent on research
 export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now = Date.now()) =>
@@ -37,18 +48,18 @@ export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now 
   });
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
-  if (!force && (await isPaused())) return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "paused" };
+  if (!force && (await isPaused())) return skipped("paused");
   if (!(await tryLock("scan", 2 * HOUR))) {
-    return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "a scan is already running" };
+    return skipped("a scan is already running");
   }
 
   try {
     const bankroll = await getBankroll(exchange);
     if (bankroll.deployable <= 0) {
-      return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "no free capital" };
+      return skipped("no free capital");
     }
     if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
-      return { open: 0, eligible: 0, researched: 0, proposed: 0, skippedReason: "daily research budget reached" };
+      return skipped("daily research budget reached");
     }
 
     const cooldownSince = new Date(Date.now() - settings.researchCooldownHours * HOUR).toISOString();
@@ -62,6 +73,7 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
     log.info("scan", { open: events.length, eligible: eligible.length, picked: picked.length });
 
     let researched = 0;
+    const failed: ScanReport["failed"] = [];
     let proposed = 0;
     for (const eventId of picked) {
       if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
@@ -111,11 +123,25 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
         proposed++;
       } catch (error) {
         log.error("event research failed", { eventId: event.id, error: errorMessage(error) });
+        failed.push({ title: event.title, error });
       }
     }
 
-    return { open: events.length, eligible: eligible.length, researched, proposed };
+    return { open: events.length, eligible: eligible.length, researched, proposed, failed };
   } finally {
     await releaseLock("scan");
+  }
+};
+
+// Runs a scan and reports it on Telegram: always when `announce` (a manual /scan),
+// otherwise only if something failed, so scheduled scans stay quiet when all is well.
+export const runScanAndReport = async (exchange: Exchange, { force = false, announce = false } = {}) => {
+  try {
+    const report = await runScan(exchange, { force });
+    if (announce || report.failed.length > 0) await notify(scanReportMessage(report));
+    return report;
+  } catch (error) {
+    await notify(failureMessage("Scan failed", error));
+    throw error;
   }
 };
