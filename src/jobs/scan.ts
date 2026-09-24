@@ -11,10 +11,15 @@ import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
 import { proposeBet, type NearMiss } from "@/strategy/propose.ts";
-import { failureMessage, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
+import { failureMessage, lagosTime, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
 import { betKeyboard, notify } from "@/telegram/notify.ts";
 
-const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+// No new deep dives start after this; with Gemini's timeout and retries, a scan always ends
+// well inside the lock's lifetime, so a crashed scan blocks the next one for 30 minutes at most.
+const SCAN_DEADLINE = 15 * MINUTE;
+const SCAN_LOCK_TTL = 30 * MINUTE;
 
 export type ScanReport = {
   open: number;
@@ -40,9 +45,11 @@ const skipped = (skippedReason: string): ScanReport => ({
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
   if (!force && (await isPaused())) return skipped("paused");
-  if (!(await tryLock("scan", 2 * HOUR))) {
-    return skipped("a scan is already running");
+  const lock = await tryLock("scan", SCAN_LOCK_TTL);
+  if (!lock.acquired) {
+    return skipped(`a scan is already running (started ${lagosTime(new Date(lock.startedAt).toISOString())}, lock clears ${lagosTime(new Date(lock.until).toISOString())} WAT)`);
   }
+  const startedAt = Date.now();
 
   try {
     const bankroll = await getBankroll(exchange);
@@ -68,6 +75,10 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
     const reviewed: ScanReport["reviewed"] = [];
     let proposed = 0;
     for (const eventId of picked) {
+      if (Date.now() - startedAt > SCAN_DEADLINE) {
+        log.warn("scan deadline reached", { researched });
+        break;
+      }
       if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
         log.warn("daily research budget reached", { budget: settings.dailyResearchBudgetUsd });
         break;
