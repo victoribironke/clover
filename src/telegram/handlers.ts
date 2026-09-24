@@ -4,13 +4,12 @@ import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
-import { runScan } from "@/jobs/scan.ts";
+import { runScanAndReport } from "@/jobs/scan.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { bot } from "./bot.ts";
-import { bankrollMessage, escapeHtml, statusLine } from "./format.ts";
-import { notify } from "./notify.ts";
+import { bankrollMessage, statusLine } from "./format.ts";
 
 const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
 Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.
@@ -54,15 +53,8 @@ export const registerHandlers = () => {
   bot.command("scan", async (ctx) => {
     await ctx.reply("🔎 Scanning. I'll message you with anything worth betting on.");
     // not awaited: a scan takes minutes and the webhook must answer quickly
-    void runScan(exchange, { force: true })
-      .then((report) =>
-        notify(
-          report.skippedReason
-            ? `Scan skipped: ${escapeHtml(report.skippedReason)}`
-            : `Scan done: ${report.open} open, ${report.eligible} eligible, ${report.researched} researched, ${report.proposed} proposed.`,
-        ),
-      )
-      .catch((error) => notify(`⚠️ Scan failed: ${escapeHtml(errorMessage(error))}`));
+    // runScanAndReport already messages you the summary or the failure
+    void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
   });
 
   bot.callbackQuery(/^cancel:(.+)$/, async (ctx) => {
