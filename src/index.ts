@@ -1,6 +1,6 @@
 import { config } from "@/config.ts";
 import { exchange } from "@/exchanges/index.ts";
-import { runScan } from "@/jobs/scan.ts";
+import { runScanAndReport } from "@/jobs/scan.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { startServer } from "@/server.ts";
@@ -37,7 +37,7 @@ const main = async () => {
     await bot.api.deleteWebhook();
     void bot.start({ onStart: (me) => log.info("telegram polling", { bot: me.username }) });
     every(settings.tickEveryMinutes, "tick", () => runTick(exchange))();
-    every(settings.scanEveryMinutes, "scan", () => runScan(exchange))();
+    every(settings.scanEveryMinutes, "scan", () => runScanAndReport(exchange))();
   }
 };
 
