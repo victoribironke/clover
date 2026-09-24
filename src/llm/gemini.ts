@@ -16,7 +16,8 @@ export const generate = async <T>(request: StructuredRequest<T>): Promise<Struct
       responseMimeType: "application/json",
       responseJsonSchema: request.jsonSchema,
       maxOutputTokens: request.maxOutputTokens,
-      thinkingConfig: { thinkingLevel: request.webSearch ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL },
+      // LOW is the cheapest level gemini-3.8-flash accepts (MINIMAL is rejected with a 400)
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
     },
   });
 
