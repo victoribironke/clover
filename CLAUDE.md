@@ -14,7 +14,7 @@ Prediction-market betting bot. Scans Bayse (NGN), researches events with Gemini 
 - Tunable values are constants in `src/settings.ts`, not env vars. Env holds secrets only (`src/config.ts`).
 - `settings.dryRun = true` is the default: no real orders are sent.
 - Size bets from live quotes. Use `Quote.avgPrice`, which is amount / (shares × payout), because CLOB fees are taken out of the shares you receive.
-- Never auto-retry order placement (`auth: "write"` requests are not retried).
+- Never auto-retry order placement (`auth: "write"` requests are not retried). Bets left in `placing` by a crash are resolved in `src/jobs/recover.ts`: paper bets are re-queued; for live bets, look the order up on Bayse and never re-send it.
 - The bot only works with `settings.capitalNgn`. Profit above it is left for withdrawal.
 - Research spend is capped by `settings.dailyResearchBudgetUsd`. If the model changes, update `src/llm/pricing.ts`.
 - Keep LLM prompts and JSON schemas terse. Use short refs (`e1`, `m1`), not UUIDs. Take sources from search metadata, not from model output.
