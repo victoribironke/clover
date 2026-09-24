@@ -23,16 +23,18 @@ export const settings = {
   model: "gemini-3.8-flash",
   // hard cap on estimated Gemini spend per UTC day, in USD
   dailyResearchBudgetUsd: 0.25,
-  maxDeepDivesPerScan: 5,
-  // don't re-research an event within this window
-  researchCooldownHours: 72,
-  // only consider events closing in this window
-  minHoursToClose: 2,
-  maxDaysToClose: 60,
+  maxDeepDivesPerScan: 4,
+  // don't re-research an event within this window (longer than any event we consider lasts)
+  researchCooldownHours: 24,
+  // only consider events that resolve within this many hours, so money comes back the same day
+  maxHoursToResolve: 12,
+  // trading must stay open at least this long: the cancel window plus a margin to place the bet
+  minMinutesBeforeClose: 60,
 
   // --- Schedule when running locally ---
   // (on Cloud Run, Cloud Scheduler drives these; see .github/workflows/deploy-cloudrun.yml)
-  scanEveryMinutes: 360,
+  // short-lived markets come and go, so scan more often; the daily budget still caps spend
+  scanEveryMinutes: 180,
   tickEveryMinutes: 1,
 
   bayseBaseUrl: "https://relay.bayse.markets",
