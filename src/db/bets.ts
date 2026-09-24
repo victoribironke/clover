@@ -1,9 +1,9 @@
 import type { Currency, ExchangeName } from "@/exchanges/types.ts";
-import { db } from "./client.ts";
+import { collection, firestore } from "./firestore.ts";
 
 // pending  -> waiting out the cancel window
 // placing  -> claimed by the executor (guards against double-placing)
-// placed   -> order filled (or paper-filled when dry_run)
+// placed   -> order filled (or paper-filled when dryRun)
 // won/lost/void -> settled
 // cancelled/skipped/failed -> never placed
 export type BetStatus =
@@ -29,7 +29,7 @@ export type Bet = {
   eventTitle: string;
   marketTitle: string;
   outcomeLabel: string;
-  analysisId: number | null;
+  analysisId: string | null;
   probability: number;
   marketPrice: number;
   quotedPrice: number;
@@ -55,157 +55,91 @@ export type NewBet = Omit<
   "id" | "status" | "orderId" | "fillPrice" | "shares" | "pnl" | "error" | "telegramMessageId" | "createdAt" | "updatedAt"
 >;
 
-const fromRow = (row: Record<string, unknown>): Bet => ({
-  id: row.id as string,
-  exchange: row.exchange as ExchangeName,
-  currency: row.currency as Currency,
-  eventId: row.event_id as string,
-  marketId: row.market_id as string,
-  outcomeId: row.outcome_id as string,
-  eventTitle: row.event_title as string,
-  marketTitle: row.market_title as string,
-  outcomeLabel: row.outcome_label as string,
-  analysisId: (row.analysis_id as number | null) ?? null,
-  probability: row.probability as number,
-  marketPrice: row.market_price as number,
-  quotedPrice: row.quoted_price as number,
-  expectedReturn: row.expected_return as number,
-  confidence: row.confidence as Confidence,
-  stake: row.stake as number,
-  rationale: row.rationale as string,
-  status: row.status as BetStatus,
-  dryRun: Boolean(row.dry_run),
-  executeAt: row.execute_at as string,
-  orderId: (row.order_id as string | null) ?? null,
-  fillPrice: (row.fill_price as number | null) ?? null,
-  shares: (row.shares as number | null) ?? null,
-  pnl: (row.pnl as number | null) ?? null,
-  error: (row.error as string | null) ?? null,
-  telegramMessageId: (row.telegram_message_id as number | null) ?? null,
-  createdAt: row.created_at as string,
-  updatedAt: row.updated_at as string,
-});
-
-export const createBet = async (bet: NewBet) => {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  await db.execute({
-    sql: `INSERT INTO bets (id, exchange, currency, event_id, market_id, outcome_id, event_title, market_title, outcome_label,
-            analysis_id, probability, market_price, quoted_price, expected_return, confidence, stake, rationale,
-            status, dry_run, execute_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-    args: [
-      id,
-      bet.exchange,
-      bet.currency,
-      bet.eventId,
-      bet.marketId,
-      bet.outcomeId,
-      bet.eventTitle,
-      bet.marketTitle,
-      bet.outcomeLabel,
-      bet.analysisId,
-      bet.probability,
-      bet.marketPrice,
-      bet.quotedPrice,
-      bet.expectedReturn,
-      bet.confidence,
-      bet.stake,
-      bet.rationale,
-      bet.dryRun ? 1 : 0,
-      bet.executeAt,
-      now,
-      now,
-    ],
-  });
-  return (await getBet(id))!;
-};
-
-export const getBet = async (id: string) => {
-  const result = await db.execute({ sql: "SELECT * FROM bets WHERE id = ?", args: [id] });
-  const row = result.rows[0];
-  return row ? fromRow(row) : null;
-};
-
-export const listBets = async (statuses: BetStatus[], limit = 50) => {
-  const placeholders = statuses.map(() => "?").join(", ");
-  const result = await db.execute({
-    sql: `SELECT * FROM bets WHERE status IN (${placeholders}) ORDER BY created_at DESC LIMIT ?`,
-    args: [...statuses, limit],
-  });
-  return result.rows.map(fromRow);
-};
-
-export const dueBets = async (nowIso: string) => {
-  const result = await db.execute({
-    sql: "SELECT * FROM bets WHERE status = 'pending' AND execute_at <= ? ORDER BY execute_at",
-    args: [nowIso],
-  });
-  return result.rows.map(fromRow);
-};
-
-// Event ids that already have a live bet, so a new scan doesn't stack another one on top
-export const activeBetEventIds = async (exchange: ExchangeName) => {
-  const result = await db.execute({
-    sql: "SELECT DISTINCT event_id FROM bets WHERE exchange = ? AND status IN ('pending', 'placing', 'placed')",
-    args: [exchange],
-  });
-  return new Set(result.rows.map((row) => row.event_id as string));
-};
-
 type BetPatch = Partial<
   Pick<Bet, "status" | "executeAt" | "orderId" | "fillPrice" | "shares" | "pnl" | "error" | "telegramMessageId" | "stake" | "quotedPrice" | "expectedReturn">
 >;
 
-const COLUMN: Record<keyof BetPatch, string> = {
-  status: "status",
-  executeAt: "execute_at",
-  orderId: "order_id",
-  fillPrice: "fill_price",
-  shares: "shares",
-  pnl: "pnl",
-  error: "error",
-  telegramMessageId: "telegram_message_id",
-  stake: "stake",
-  quotedPrice: "quoted_price",
-  expectedReturn: "expected_return",
+const LIVE: BetStatus[] = ["pending", "placing", "placed"];
+const SETTLED: BetStatus[] = ["won", "lost", "void"];
+
+const bets = () => collection("bets");
+
+export const createBet = async (bet: NewBet) => {
+  const ref = bets().doc();
+  const now = new Date().toISOString();
+  const created: Bet = {
+    ...bet,
+    id: ref.id,
+    status: "pending",
+    orderId: null,
+    fillPrice: null,
+    shares: null,
+    pnl: null,
+    error: null,
+    telegramMessageId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await ref.set(created);
+  return created;
+};
+
+export const getBet = async (id: string) => {
+  const snapshot = await bets().doc(id).get();
+  return snapshot.exists ? (snapshot.data() as Bet) : null;
+};
+
+// Filtering beyond `status in` and sorting happen here rather than in Firestore,
+// so no composite indexes are needed. Bet volumes are small.
+export const listBets = async (statuses: BetStatus[], limit = 50) => {
+  const snapshot = await bets().where("status", "in", statuses).get();
+  return snapshot.docs
+    .map((doc) => doc.data() as Bet)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+};
+
+export const dueBets = async (nowIso: string) => {
+  const snapshot = await bets().where("status", "==", "pending").get();
+  return snapshot.docs
+    .map((doc) => doc.data() as Bet)
+    .filter((bet) => bet.executeAt <= nowIso)
+    .sort((a, b) => a.executeAt.localeCompare(b.executeAt));
+};
+
+// Event ids that already have a live bet, so a new scan doesn't stack another one on top
+export const activeBetEventIds = async (exchange: ExchangeName) => {
+  const live = await listBets(LIVE, 1000);
+  return new Set(live.filter((bet) => bet.exchange === exchange).map((bet) => bet.eventId));
 };
 
 // Update a bet, optionally only if it is still in one of `fromStatuses`.
 // Returns false when the guard didn't match (e.g. the bet was cancelled meanwhile).
-export const updateBet = async (id: string, patch: BetPatch, fromStatuses?: BetStatus[]) => {
-  const entries = Object.entries(patch) as [keyof BetPatch, BetPatch[keyof BetPatch]][];
-  const sets = entries.map(([key]) => `${COLUMN[key]} = ?`);
-  const args = entries.map(([, value]) => value ?? null);
-  let sql = `UPDATE bets SET ${[...sets, "updated_at = ?"].join(", ")} WHERE id = ?`;
-  args.push(new Date().toISOString(), id);
-  if (fromStatuses?.length) {
-    sql += ` AND status IN (${fromStatuses.map(() => "?").join(", ")})`;
-    args.push(...fromStatuses);
-  }
-  const result = await db.execute({ sql, args });
-  return result.rowsAffected > 0;
-};
+export const updateBet = (id: string, patch: BetPatch, fromStatuses?: BetStatus[]) =>
+  firestore.runTransaction(async (tx) => {
+    const ref = bets().doc(id);
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) return false;
+    if (fromStatuses?.length && !fromStatuses.includes(snapshot.get("status") as BetStatus)) return false;
+    tx.update(ref, { ...patch, updatedAt: new Date().toISOString() });
+    return true;
+  });
 
-export type BetTotals = { exposure: number; realizedPnl: number };
+export type BetTotals = {
+  // stakes in pending or unsettled bets
+  exposure: number;
+  realizedPnl: number;
+  // live stakes not yet sent to the exchange (the wallet balance doesn't reflect them yet)
+  unsent: number;
+};
 
 export const betTotals = async (exchange: ExchangeName, dryRun: boolean): Promise<BetTotals> => {
-  const result = await db.execute({
-    sql: `SELECT
-            COALESCE(SUM(CASE WHEN status IN ('pending', 'placing', 'placed') THEN stake END), 0) AS exposure,
-            COALESCE(SUM(CASE WHEN status IN ('won', 'lost', 'void') THEN pnl END), 0) AS realized_pnl
-          FROM bets WHERE exchange = ? AND dry_run = ?`,
-    args: [exchange, dryRun ? 1 : 0],
-  });
-  const row = result.rows[0]!;
-  return { exposure: Number(row.exposure), realizedPnl: Number(row.realized_pnl) };
-};
-
-// Live stakes not yet sent to the exchange (the wallet balance doesn't reflect them yet)
-export const unsentLiveStakes = async (exchange: ExchangeName) => {
-  const result = await db.execute({
-    sql: "SELECT COALESCE(SUM(stake), 0) AS total FROM bets WHERE exchange = ? AND dry_run = 0 AND status IN ('pending', 'placing')",
-    args: [exchange],
-  });
-  return Number(result.rows[0]!.total);
+  const all = await listBets([...LIVE, ...SETTLED], 10_000);
+  const mine = all.filter((bet) => bet.exchange === exchange && bet.dryRun === dryRun);
+  const sum = (items: Bet[], pick: (bet: Bet) => number) => items.reduce((total, bet) => total + pick(bet), 0);
+  return {
+    exposure: sum(mine.filter((bet) => LIVE.includes(bet.status)), (bet) => bet.stake),
+    realizedPnl: sum(mine.filter((bet) => SETTLED.includes(bet.status)), (bet) => bet.pnl ?? 0),
+    unsent: sum(mine.filter((bet) => bet.status === "pending" || bet.status === "placing"), (bet) => bet.stake),
+  };
 };
