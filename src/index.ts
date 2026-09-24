@@ -1,10 +1,10 @@
 import { config } from "@/config.ts";
-import { migrate } from "@/db/client.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { runScan } from "@/jobs/scan.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { startServer } from "@/server.ts";
+import { settings } from "@/settings.ts";
 import { bot } from "@/telegram/bot.ts";
 import { registerHandlers } from "@/telegram/handlers.ts";
 
@@ -18,10 +18,9 @@ const every = (minutes: number, name: string, job: () => Promise<unknown>) => {
 };
 
 const main = async () => {
-  await migrate();
   registerHandlers();
   const server = startServer();
-  log.info("server listening", { port: server.port, mode: config.RUN_MODE, dryRun: config.DRY_RUN });
+  log.info("server listening", { port: server.port, cloudRun: config.onCloudRun, dryRun: settings.dryRun });
 
   await bot.api.setMyCommands([
     { command: "status", description: "Bankroll and profit" },
@@ -31,18 +30,14 @@ const main = async () => {
     { command: "resume", description: "Start again" },
   ]);
 
-  if (config.TELEGRAM_MODE === "webhook") {
-    if (!config.PUBLIC_URL) throw new Error("PUBLIC_URL is required when TELEGRAM_MODE=webhook");
-    await bot.api.setWebhook(`${config.PUBLIC_URL}/telegram`, { secret_token: config.TELEGRAM_WEBHOOK_SECRET });
-  } else {
+  // On Cloud Run the deploy workflow registers the Telegram webhook and Cloud Scheduler
+  // drives /jobs/*. Locally: long polling (note: this removes the webhook while you test
+  // with the production bot token; the next deploy sets it again) and in-process timers.
+  if (!config.onCloudRun) {
     await bot.api.deleteWebhook();
     void bot.start({ onStart: (me) => log.info("telegram polling", { bot: me.username }) });
-  }
-
-  // In the cloud, Cloud Scheduler drives these through /jobs/*
-  if (config.RUN_MODE === "local") {
-    every(config.TICK_INTERVAL_MINUTES, "tick", () => runTick(exchange))();
-    every(config.SCAN_INTERVAL_MINUTES, "scan", () => runScan(exchange))();
+    every(settings.tickEveryMinutes, "tick", () => runTick(exchange))();
+    every(settings.scanEveryMinutes, "scan", () => runScan(exchange))();
   }
 };
 
