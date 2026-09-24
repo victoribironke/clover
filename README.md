@@ -68,6 +68,19 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 
 Send `/status` to your bot to check it's alive.
 
+### Production
+
+Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, europe-west9, project `fl-clover`)
+
+- **Health check:** open [`/health`](https://clover-uhkg4fo2na-od.a.run.app/health). It returns `{"ok":true}`.
+- **Run a job by hand**, the way Cloud Scheduler does. Anything without the secret gets `401`:
+  ```bash
+  curl -X POST -d '' -H "Authorization: Bearer $APP_SECRET" https://clover-uhkg4fo2na-od.a.run.app/jobs/tick
+  ```
+  Use `/jobs/scan` in place of `/jobs/tick` to run a scan. Sending `/scan` in Telegram does the same thing.
+- **Logs:** Cloud Run → `clover` → *Logs*. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
+- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-tick` and `clover-scan`. *Force run* triggers one immediately.
+
 ## Running locally
 
 1. `bun install`
