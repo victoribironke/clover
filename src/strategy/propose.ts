@@ -3,6 +3,7 @@ import type { Confidence } from "@/db/bets.ts";
 import type { Exchange, Market, MarketEvent, Outcome } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import type { Estimate } from "@/research/deep-dive.ts";
+import { settings } from "@/settings.ts";
 import type { Bankroll } from "./bankroll.ts";
 import { blendProbability, expectedReturn, stakeFor } from "./sizing.ts";
 
@@ -12,7 +13,6 @@ export type Proposal = {
   modelProbability: number;
   probability: number;
   confidence: Confidence;
-  reasoning: string;
   stake: number;
   quotedPrice: number;
   expectedReturn: number;
@@ -38,7 +38,7 @@ const priceStake = async (
   for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= market.minOrderAmount; attempt++) {
     const quote = await exchange.quote({ eventId: event.id, marketId: market.id, outcomeId: outcome.id, amount: stake });
     const edge = expectedReturn(probability, quote.avgPrice);
-    if (quote.completeFill && edge >= config.MIN_EDGE) {
+    if (quote.completeFill && edge >= settings.minEdge) {
       return { stake, quotedPrice: quote.avgPrice, expectedReturn: edge };
     }
     stake = Math.floor(stake / 2);
@@ -64,7 +64,7 @@ export const proposeBet = async (
       const modelProbability = index === 0 ? estimate.probabilityOutcome1 : 1 - estimate.probabilityOutcome1;
       const probability = blendProbability(modelProbability, outcome.price, estimate.confidence);
       // cheap pre-check at the listed price before spending quote calls; the real price is only worse
-      if (expectedReturn(probability, outcome.price) < config.MIN_EDGE) continue;
+      if (expectedReturn(probability, outcome.price) < settings.minEdge) continue;
 
       const stake = stakeFor({
         probability,
@@ -72,8 +72,8 @@ export const proposeBet = async (
         bankroll: bankroll.bankroll,
         deployable: bankroll.deployable,
         minOrderAmount: market.minOrderAmount,
-        kellyMultiplier: config.KELLY_FRACTION,
-        maxBetFraction: config.MAX_BET_FRACTION,
+        kellyMultiplier: settings.kellyFraction,
+        maxBetFraction: settings.maxBetFraction,
       });
       if (stake === 0) continue;
 
@@ -86,7 +86,6 @@ export const proposeBet = async (
           modelProbability,
           probability,
           confidence: estimate.confidence,
-          reasoning: estimate.reasoning,
           ...priced,
           expectedProfit: priced.stake * priced.expectedReturn,
         });
