@@ -39,7 +39,8 @@ export const triageEvents = async (events: MarketEvent[], limit: number) => {
     jsonSchema: schema,
     parse,
     webSearch: false,
-    maxOutputTokens: 1500,
+    // includes thinking tokens; only what's used is billed
+    maxOutputTokens: 4000,
   });
   const costUsd = await recordUsage(result.usage);
 
