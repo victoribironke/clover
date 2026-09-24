@@ -7,11 +7,11 @@ import { errorMessage, log } from "@/lib/logger.ts";
 import { bot } from "@/telegram/bot.ts";
 
 const authorizedCron = (request: Request) =>
-  request.headers.get("authorization") === `Bearer ${config.CRON_SECRET}`;
+  request.headers.get("authorization") === `Bearer ${config.APP_SECRET}`;
 
 const telegramWebhook =
-  config.TELEGRAM_MODE === "webhook"
-    ? webhookCallback(bot, "std/http", { secretToken: config.TELEGRAM_WEBHOOK_SECRET })
+  config.onCloudRun
+    ? webhookCallback(bot, "std/http", { secretToken: config.APP_SECRET })
     : null;
 
 const runJob = async (name: string, job: () => Promise<unknown>) => {
@@ -28,7 +28,7 @@ const runJob = async (name: string, job: () => Promise<unknown>) => {
 // Cloud Scheduler hits /jobs/scan and /jobs/tick; Telegram hits /telegram in webhook mode
 export const startServer = () =>
   Bun.serve({
-    port: config.PORT,
+    port: config.port,
     // scans run deep research and can take many minutes
     idleTimeout: 0,
     routes: {
