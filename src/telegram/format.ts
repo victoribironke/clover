@@ -1,0 +1,84 @@
+import type { Bet } from "@/db/bets.ts";
+import type { DeepDive } from "@/research/deep-dive.ts";
+import type { Bankroll } from "@/strategy/bankroll.ts";
+
+export const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
+export const money = (amount: number) => naira.format(amount);
+
+export const pct = (value: number, signed = false) => {
+  const text = `${(value * 100).toFixed(1)}%`;
+  return signed && value > 0 ? `+${text}` : text;
+};
+
+export const lagosTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-GB", {
+    timeZone: "Africa/Lagos",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "numeric",
+    month: "short",
+  });
+
+const tag = (bet: Pick<Bet, "dryRun">) => (bet.dryRun ? " <i>(paper)</i>" : "");
+
+export const proposalMessage = (bet: Bet, research: DeepDive) => {
+  const sources = research.sources
+    .slice(0, 4)
+    .map((source) => `• <a href="${escapeHtml(source.url)}">${escapeHtml(source.title)}</a>`)
+    .join("\n");
+  const factors = research.keyFactors
+    .slice(0, 5)
+    .map((factor) => `• ${escapeHtml(factor)}`)
+    .join("\n");
+
+  return [
+    `🎯 <b>New bet</b>${tag(bet)}`,
+    `<b>${escapeHtml(bet.eventTitle)}</b>`,
+    bet.marketTitle !== bet.eventTitle ? `Market: ${escapeHtml(bet.marketTitle)}` : null,
+    `Pick: <b>${escapeHtml(bet.outcomeLabel)}</b>`,
+    "",
+    `Stake: <b>${money(bet.stake)}</b> at ${pct(bet.quotedPrice)} (market shows ${pct(bet.marketPrice)})`,
+    `Our probability: <b>${pct(bet.probability)}</b> · confidence ${bet.confidence}`,
+    `Expected return: <b>${pct(bet.expectedReturn, true)}</b> (≈ ${money(bet.stake * bet.expectedReturn)})`,
+    `Pays ${money(bet.stake / bet.quotedPrice)} if it wins`,
+    "",
+    `<b>Why</b>\n${escapeHtml(research.summary)}`,
+    factors ? `\n<b>Key factors</b>\n${factors}` : null,
+    sources ? `\n<b>Sources</b>\n${sources}` : null,
+    "",
+    `⏳ Places ${lagosTime(bet.executeAt)} WAT unless you cancel.`,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+};
+
+export const statusLine = (bet: Bet) => {
+  const icon: Record<Bet["status"], string> = {
+    pending: "⏳",
+    placing: "🔄",
+    placed: "✅",
+    won: "🏆",
+    lost: "❌",
+    void: "↩️",
+    cancelled: "🚫",
+    skipped: "⏭️",
+    failed: "⚠️",
+  };
+  const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl)}` : "";
+  return `${icon[bet.status]} ${escapeHtml(bet.eventTitle)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
+};
+
+export const bankrollMessage = (bankroll: Bankroll, paused: boolean) =>
+  [
+    `<b>Clover</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
+    `Capital: ${money(bankroll.capital)}`,
+    `Working bankroll: ${money(bankroll.bankroll)}`,
+    `In play: ${money(bankroll.exposure)}`,
+    `Free to bet: ${money(bankroll.deployable)}`,
+    `Realized P&L: ${money(bankroll.realizedPnl)}`,
+    `Withdrawable profit: <b>${money(bankroll.withdrawable)}</b>`,
+  ].join("\n");
