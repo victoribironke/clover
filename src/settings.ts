@@ -13,7 +13,7 @@ export const settings = {
   // hard cap on a single bet, as a fraction of capital
   maxBetFraction: 0.1,
   // minimum expected return after fees and price impact (0.05 = +5%)
-  minEdge: 0.05,
+  minEdge: 0.03,
   // minutes you have to cancel a bet on Telegram before it's placed
   cancelWindowMinutes: 30,
   maxSlippage: 0.02,
