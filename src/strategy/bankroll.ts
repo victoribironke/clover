@@ -1,6 +1,7 @@
 import { config } from "@/config.ts";
-import { betTotals, unsentLiveStakes } from "@/db/bets.ts";
+import { betTotals } from "@/db/bets.ts";
 import type { Exchange } from "@/exchanges/types.ts";
+import { settings } from "@/settings.ts";
 
 export type Bankroll = {
   capital: number;
@@ -22,15 +23,15 @@ export type Bankroll = {
 // profit that is left alone for withdrawal; after losses it works with what's left.
 // In dry-run mode the wallet is simulated as capital + paper P&L.
 export const getBankroll = async (exchange: Exchange): Promise<Bankroll> => {
-  const capital = config.CAPITAL_NGN;
-  const dryRun = config.DRY_RUN;
-  const { exposure, realizedPnl } = await betTotals(exchange.name, dryRun);
+  const capital = settings.capitalNgn;
+  const dryRun = settings.dryRun;
+  const { exposure, realizedPnl, unsent } = await betTotals(exchange.name, dryRun);
 
   // In live mode the wallet balance already has placed stakes deducted, but not
   // pending ones (they haven't been sent yet), so subtract those separately.
   const walletAvailable = dryRun
     ? capital + realizedPnl - exposure
-    : (await exchange.getAvailableBalance()) - (await unsentLiveStakes(exchange.name));
+    : (await exchange.getAvailableBalance()) - unsent;
 
   const bankroll = Math.max(0, Math.min(capital, walletAvailable + exposure));
   const deployable = Math.max(0, Math.min(walletAvailable, bankroll - exposure));
