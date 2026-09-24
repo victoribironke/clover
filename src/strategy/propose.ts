@@ -1,7 +1,6 @@
-import { config } from "@/config.ts";
 import type { Confidence } from "@/db/bets.ts";
 import type { Exchange, Market, MarketEvent, Outcome } from "@/exchanges/types.ts";
-import { errorMessage, log } from "@/lib/logger.ts";
+import { describeError } from "@/lib/errors.ts";
 import type { Estimate } from "@/research/deep-dive.ts";
 import { settings } from "@/settings.ts";
 import type { Bankroll } from "./bankroll.ts";
@@ -19,10 +18,32 @@ export type Proposal = {
   expectedProfit: number;
 };
 
+// The best bet that didn't make it, and why: shown in the scan summary so a
+// "0 proposed" scan still tells you what the research found
+export type NearMiss = {
+  marketTitle: string;
+  outcomeLabel: string;
+  modelProbability: number;
+  marketPrice: number;
+  probability: number;
+  confidence: Confidence;
+  // the price of the last check: the listed price, or the live quote if it got that far
+  price: number;
+  expectedReturn: number;
+  reason: string;
+};
+
+export type Verdict = { proposal: Proposal | null; nearMiss: NearMiss | null };
+
 // Prices this close to 0/1 are almost always right and fee floors eat any edge
 const MIN_PRICE = 0.03;
 const MAX_PRICE = 0.97;
 const QUOTE_ATTEMPTS = 4;
+const needs = `+${Math.round(settings.minEdge * 100)}%`;
+
+type Priced =
+  | { ok: true; stake: number; quotedPrice: number; expectedReturn: number }
+  | { ok: false; quotedPrice: number; expectedReturn: number; reason: string };
 
 // Price the stake with a live quote (fees + price impact included), shrinking it
 // until the edge survives or the stake drops below the market minimum.
@@ -33,17 +54,24 @@ const priceStake = async (
   outcome: Outcome,
   probability: number,
   initialStake: number,
-) => {
+): Promise<Priced> => {
   let stake = initialStake;
+  let last: Priced = { ok: false, quotedPrice: outcome.price, expectedReturn: 0, reason: "no quote" };
   for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= market.minOrderAmount; attempt++) {
     const quote = await exchange.quote({ eventId: event.id, marketId: market.id, outcomeId: outcome.id, amount: stake });
     const edge = expectedReturn(probability, quote.avgPrice);
     if (quote.completeFill && edge >= settings.minEdge) {
-      return { stake, quotedPrice: quote.avgPrice, expectedReturn: edge };
+      return { ok: true, stake, quotedPrice: quote.avgPrice, expectedReturn: edge };
     }
+    last = {
+      ok: false,
+      quotedPrice: quote.avgPrice,
+      expectedReturn: edge,
+      reason: quote.completeFill ? `fees and price impact eat the edge (needs ${needs})` : "not enough liquidity",
+    };
     stake = Math.floor(stake / 2);
   }
-  return null;
+  return last;
 };
 
 export const proposeBet = async (
@@ -51,8 +79,9 @@ export const proposeBet = async (
   event: MarketEvent,
   estimates: Estimate[],
   bankroll: Bankroll,
-): Promise<Proposal | null> => {
+): Promise<Verdict> => {
   const candidates: Proposal[] = [];
+  const misses: NearMiss[] = [];
 
   for (const estimate of estimates) {
     const market = event.markets.find((item) => item.id === estimate.marketId);
@@ -63,8 +92,25 @@ export const proposeBet = async (
 
       const modelProbability = index === 0 ? estimate.probabilityOutcome1 : 1 - estimate.probabilityOutcome1;
       const probability = blendProbability(modelProbability, outcome.price, estimate.confidence);
+      const miss = (price: number, edge: number, reason: string) =>
+        misses.push({
+          marketTitle: market.title,
+          outcomeLabel: outcome.label,
+          modelProbability,
+          marketPrice: outcome.price,
+          probability,
+          confidence: estimate.confidence,
+          price,
+          expectedReturn: edge,
+          reason,
+        });
+
       // cheap pre-check at the listed price before spending quote calls; the real price is only worse
-      if (expectedReturn(probability, outcome.price) < settings.minEdge) continue;
+      const listedEdge = expectedReturn(probability, outcome.price);
+      if (listedEdge < settings.minEdge) {
+        miss(outcome.price, listedEdge, `edge too small (needs ${needs})`);
+        continue;
+      }
 
       const stake = stakeFor({
         probability,
@@ -75,27 +121,36 @@ export const proposeBet = async (
         kellyMultiplier: settings.kellyFraction,
         maxBetFraction: settings.maxBetFraction,
       });
-      if (stake === 0) continue;
+      if (stake === 0) {
+        miss(outcome.price, listedEdge, `stake would be under the ₦${market.minOrderAmount} minimum`);
+        continue;
+      }
 
       try {
         const priced = await priceStake(exchange, event, market, outcome, probability, stake);
-        if (!priced) continue;
+        if (!priced.ok) {
+          miss(priced.quotedPrice, priced.expectedReturn, priced.reason);
+          continue;
+        }
         candidates.push({
           market,
           outcome,
           modelProbability,
           probability,
           confidence: estimate.confidence,
-          ...priced,
+          stake: priced.stake,
+          quotedPrice: priced.quotedPrice,
+          expectedReturn: priced.expectedReturn,
           expectedProfit: priced.stake * priced.expectedReturn,
         });
       } catch (error) {
-        log.warn("quote failed", { eventId: event.id, marketId: market.id, error: errorMessage(error) });
+        miss(outcome.price, listedEdge, `quote failed: ${describeError(error).message}`);
       }
     }
   }
 
   // One bet per event: in combined events the markets are correlated, so stacking bets compounds risk
   candidates.sort((a, b) => b.expectedProfit - a.expectedProfit);
-  return candidates[0] ?? null;
+  misses.sort((a, b) => b.expectedReturn - a.expectedReturn);
+  return { proposal: candidates[0] ?? null, nearMiss: misses[0] ?? null };
 };
