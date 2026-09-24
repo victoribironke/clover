@@ -12,6 +12,11 @@ const clip = (text: string, max: number) => {
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 };
 
+// "2026-09-24T21:45:00.000Z" -> "2026-09-24 21:45Z": minutes matter for same-day markets
+export const utc = (iso: string) => `${iso.slice(0, 10)} ${iso.slice(11, 16)}Z`;
+
+export const nowUtc = () => utc(new Date().toISOString());
+
 export type DescribedEvent = {
   text: string;
   // short refs ("m1", "m2", …) cost far fewer tokens than UUIDs, in and out
@@ -30,7 +35,8 @@ export const describeEvent = (event: MarketEvent): DescribedEvent => {
 
   const lines = [
     `Event: ${event.title}`,
-    event.closingDate && `Closes: ${event.closingDate.slice(0, 16)}`,
+    event.closingDate && `Trading closes: ${utc(event.closingDate)}`,
+    event.resolutionDate && `Resolves: ${utc(event.resolutionDate)}`,
     event.resolutionSource && `Source: ${clip(event.resolutionSource, 150)}`,
     // descriptions often repeat the rules verbatim
     event.description && clip(event.description, 500) !== clip(sharedRules ?? "", 500) && `Info: ${clip(event.description, 400)}`,
