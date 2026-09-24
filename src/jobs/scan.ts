@@ -1,20 +1,20 @@
-import { config } from "@/config.ts";
 import { recentlyAnalyzedEventIds, saveAnalysis } from "@/db/analyses.ts";
 import { activeBetEventIds, createBet, updateBet } from "@/db/bets.ts";
 import { isPaused, releaseLock, tryLock } from "@/db/kv.ts";
 import { spendToday } from "@/db/spend.ts";
 import type { Exchange, MarketEvent } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { isGeminiUnavailable } from "@/llm/gemini.ts";
 import { deepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
+import { eligibleEvents } from "@/strategy/eligibility.ts";
 import { proposeBet } from "@/strategy/propose.ts";
 import { failureMessage, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
 import { betKeyboard, notify } from "@/telegram/notify.ts";
 
 const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
 
 export type ScanReport = {
   open: number;
@@ -34,18 +34,6 @@ const skipped = (skippedReason: string): ScanReport => ({
   failed: [],
   skippedReason,
 });
-
-// Cheap, deterministic filters before any money is spent on research
-export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now = Date.now()) =>
-  events.filter((event) => {
-    if (event.status !== "open" || exclude.has(event.id)) return false;
-    if (!event.supportedCurrencies.includes("NGN")) return false;
-    if (!event.markets.some((market) => market.status === "open")) return false;
-    // no closing date: long-running markets like "who wins the 2027 election"; keep them
-    if (!event.closingDate) return true;
-    const untilClose = new Date(event.closingDate).getTime() - now;
-    return untilClose >= settings.minHoursToClose * HOUR && untilClose <= settings.maxDaysToClose * DAY;
-  });
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
   if (!force && (await isPaused())) return skipped("paused");
@@ -124,6 +112,8 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
       } catch (error) {
         log.error("event research failed", { eventId: event.id, error: errorMessage(error) });
         failed.push({ title: event.title, error });
+        // Unresearched events aren't recorded, so the next scan picks them up again
+        if (isGeminiUnavailable(error)) break;
       }
     }
 
