@@ -1,13 +1,10 @@
 "use client";
 
 import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { lagosDate, lagosDateTime, money } from "@/lib/format";
 import type { CurvePoint } from "@/lib/overview";
 
 type BankrollChartProps = { points: CurvePoint[]; capital: number };
-
-const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
-const shortDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "short" });
 
 // Capital + realized P&L after each settled bet; the dashed line is the starting capital
 const BankrollChart = ({ points, capital }: BankrollChartProps) => {
@@ -17,9 +14,9 @@ const BankrollChart = ({ points, capital }: BankrollChartProps) => {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-        <XAxis dataKey="at" tickFormatter={shortDate} tick={{ fontSize: 12 }} stroke="var(--muted)" minTickGap={32} />
+        <XAxis dataKey="at" tickFormatter={lagosDate} tick={{ fontSize: 12 }} stroke="var(--muted)" minTickGap={32} />
         <YAxis
-          tickFormatter={(value: number) => naira.format(value)}
+          tickFormatter={money}
           tick={{ fontSize: 12 }}
           stroke="var(--muted)"
           width={84}
@@ -27,8 +24,8 @@ const BankrollChart = ({ points, capital }: BankrollChartProps) => {
         />
         <ReferenceLine y={capital} stroke="var(--muted)" strokeDasharray="4 4" />
         <Tooltip
-          formatter={(value) => naira.format(Number(value))}
-          labelFormatter={(label) => new Date(String(label)).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })}
+          formatter={(value) => money(Number(value))}
+          labelFormatter={(label) => lagosDateTime(String(label))}
           contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }}
         />
         <Line type="stepAfter" dataKey="bankroll" name="Bankroll" stroke="var(--accent)" strokeWidth={2} dot={false} />
