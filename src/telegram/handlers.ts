@@ -7,11 +7,13 @@ import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { selfOrigin } from "@/lib/self.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { summarize } from "@/study/stats.ts";
 import { bot } from "./bot.ts";
-import { bankrollMessage, statusLine, studyMessage } from "./format.ts";
+import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./format.ts";
+import { notify } from "./notify.ts";
 
 const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
 Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.
@@ -60,9 +62,18 @@ export const registerHandlers = () => {
 
   bot.command("scan", async (ctx) => {
     await ctx.reply("🔎 Scanning. I'll message you with anything worth betting on.");
-    // not awaited: a scan takes minutes and the webhook must answer quickly
-    // runScanAndReport already messages you the summary or the failure
-    void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
+    // A scan takes minutes and the webhook must answer quickly, so it's not awaited here.
+    // On Cloud Run it goes through our own /jobs/scan: CPU is only on during a request, and that
+    // request stays open for the whole scan. Either way the scan reports its own result.
+    const origin = selfOrigin();
+    if (config.onCloudRun && origin) {
+      void fetch(`${origin}/jobs/scan?manual=1`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${config.APP_SECRET}` },
+      }).catch((error) => notify(failureMessage("Couldn't start the scan", error)));
+    } else {
+      void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
+    }
   });
 
   bot.callbackQuery(/^cancel:(.+)$/, async (ctx) => {
