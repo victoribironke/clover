@@ -2,6 +2,7 @@ import { config } from "@/config.ts";
 import { releaseHeldLocks } from "@/db/kv.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
+import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { startServer } from "@/server.ts";
@@ -45,6 +46,7 @@ const main = async () => {
     { command: "status", description: "Bankroll and profit" },
     { command: "bets", description: "Pending and open bets" },
     { command: "scan", description: "Run a scan now" },
+    { command: "study", description: "Late-price study and void rates" },
     { command: "pause", description: "Stop scanning and placing" },
     { command: "resume", description: "Start again" },
   ]);
@@ -57,6 +59,7 @@ const main = async () => {
     void bot.start({ onStart: (me) => log.info("telegram polling", { bot: me.username }) });
     every(settings.tickEveryMinutes, "tick", () => runTick(exchange))();
     every(settings.scanEveryMinutes, "scan", () => runScanAndReport(exchange))();
+    every(settings.studyEveryMinutes, "study", () => runStudy(exchange))();
   }
 };
 
