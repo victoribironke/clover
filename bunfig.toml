@@ -1,0 +1,3 @@
+# Bot tests live in src/. The web app (web/) has its own dependencies and runs its own tests.
+[test]
+root = "./src"
