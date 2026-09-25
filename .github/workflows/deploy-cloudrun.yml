@@ -76,8 +76,10 @@ jobs:
           docker push "$IMAGE"
 
       # --max-instances=1: one bot, no racing instances
-      # --no-cpu-throttling: a /scan started from Telegram keeps running after the webhook replies
-      # --timeout=3600: scans run research and can take many minutes
+      # --cpu-throttling: request-based billing, so CPU (and cost) only while handling a request. The
+      #   alternative (--no-cpu-throttling) bills every second the instance is up; with a tick every
+      #   5 minutes that is 24/7, about $44/month. Long work (scans) runs inside its own request.
+      # --timeout=3600: a scan request stays open for the whole scan, which can take many minutes
       # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET
       # --service-account: runs as clover-runtime, which only has Firestore access
       # Only secrets go here; every other setting lives in src/settings.ts
@@ -88,7 +90,7 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
-          flags: --allow-unauthenticated --max-instances=1 --no-cpu-throttling --timeout=3600 --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          flags: --allow-unauthenticated --max-instances=1 --cpu-throttling --timeout=3600 --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
           env_vars_update_strategy: overwrite
           env_vars: |-
             BAYSE_PUBLIC_KEY=${{ secrets.BAYSE_PUBLIC_KEY }}
