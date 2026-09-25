@@ -4,6 +4,7 @@ import type { ExchangeName } from "@/exchanges/types.ts";
 import type { ScanReport } from "@/jobs/scan.ts";
 import { describeError } from "@/lib/errors.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
+import type { StudySummary } from "@/study/stats.ts";
 import type { Bankroll } from "@/strategy/bankroll.ts";
 
 export const escapeHtml = (text: string) =>
@@ -142,6 +143,38 @@ export const statusLine = (bet: Bet) => {
   };
   const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl)}` : "";
   return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
+};
+
+// 📊 Late-price study: are prices near the end fair, which kinds void, and does trading after
+// the measurement time pay?
+export const studyMessage = (summary: StudySummary) => {
+  if (summary.events === 0) return "📊 <b>Late-price study</b>\nNo data yet. The study job records settled markets every 6 hours.";
+  const signed = (value: number) => `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)} pts`;
+  const lines = [
+    `📊 <b>Late-price study</b> · ${summary.events} markets since ${summary.since ? lagosTime(summary.since) : "?"}`,
+    "",
+    "<b>10 min before measurement: price → how often YES won</b>",
+    ...summary.at10
+      .filter((bucket) => bucket.n > 0)
+      .map((bucket) => `${bucket.label}: ${bucket.n} · priced ${pct(bucket.avgPrice)} → won ${pct(bucket.winRate)}`),
+    "<i>Won rate well above the price = late underpricing (the edge you spotted).</i>",
+    "",
+    "<b>By type</b> (voids · late gap)",
+    ...summary.byKind.map(
+      (row) =>
+        `${escapeHtml(row.kind)}: ${row.voids}/${row.events} voided (${pct(row.events ? row.voids / row.events : 0)})` +
+        (row.lateGap === null ? "" : ` · ${signed(row.lateGap)} over ${row.markets} mkts`),
+    ),
+  ];
+  if (summary.lateOpen.n > 0) {
+    lines.push(
+      "",
+      "<b>Still trading 15 min after measurement</b> (price 10-90%)",
+      `${summary.lateOpen.n} markets · priced ${pct(summary.lateOpen.avgPrice)} → won ${pct(summary.lateOpen.winRate)}`,
+    );
+  }
+  lines.push("", "<i>Needs a few hundred markets before it means much.</i>");
+  return lines.join("\n");
 };
 
 export type Spend = { today: number; month: number; dailyBudget: number };
