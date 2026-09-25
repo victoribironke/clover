@@ -5,6 +5,7 @@ import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { rememberOrigin } from "@/lib/self.ts";
 import { bot } from "@/telegram/bot.ts";
 
 const authorizedCron = (request: Request) =>
@@ -35,11 +36,19 @@ export const startServer = () =>
     routes: {
       "/health": () => Response.json({ ok: true }),
       "/telegram": {
-        POST: (request) => (telegramWebhook ? telegramWebhook(request) : new Response("polling mode", { status: 404 })),
+        POST: (request) => {
+          if (!telegramWebhook) return new Response("polling mode", { status: 404 });
+          rememberOrigin(request);
+          return telegramWebhook(request);
+        },
       },
       "/jobs/scan": {
-        POST: (request) =>
-          authorizedCron(request) ? runJob("scan", () => runScanAndReport(exchange)) : new Response("unauthorized", { status: 401 }),
+        // ?manual=1 is a /scan from Telegram: run even when paused, and always report back
+        POST: (request) => {
+          if (!authorizedCron(request)) return new Response("unauthorized", { status: 401 });
+          const manual = new URL(request.url).searchParams.get("manual") === "1";
+          return runJob("scan", () => runScanAndReport(exchange, { force: manual, announce: manual }));
+        },
       },
       "/jobs/study": {
         POST: (request) =>
