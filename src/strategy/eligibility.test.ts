@@ -19,6 +19,8 @@ const event = (overrides: Partial<MarketEvent>): MarketEvent => ({
   status: "open",
   closingDate: null,
   resolutionDate: null,
+  resolvedAt: null,
+  openingDate: null,
   liquidity: 0,
   totalVolume: 0,
   supportedCurrencies: ["USD", "NGN"],
@@ -74,5 +76,14 @@ describe("eligibleEvents", () => {
   });
   test("drops events without NGN trading", () => {
     expect(passes({ resolutionDate: inHours(5), supportedCurrencies: ["USD"] })).toBe(false);
+  });
+});
+
+describe("excluded kinds", () => {
+  test("drops engagement markets even in allowed categories", () => {
+    expect(passes({ category: "SOCIAL MEDIA", title: "How Many Likes Will Taylor Swift's Latest Post Get?", resolutionDate: inHours(5) })).toBe(false);
+  });
+  test("keeps post counts in the same category", () => {
+    expect(passes({ category: "SOCIAL MEDIA", title: "Pop Base’s Number of X Posts Today, September 25, 2026?", resolutionDate: inHours(5) })).toBe(true);
   });
 });
