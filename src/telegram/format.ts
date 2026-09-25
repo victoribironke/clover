@@ -50,6 +50,8 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
     `Expected return: <b>${pct(bet.expectedReturn, true)}</b> (≈ ${money(bet.stake * bet.expectedReturn)})`,
     `Pays ${money(bet.stake / bet.quotedPrice)} if it wins`,
     "",
+    `<b>Latest data</b>\n📏 ${escapeHtml(research.reading)}`,
+    "",
     `<b>Why</b>\n${escapeHtml(research.summary)}`,
     factors ? `\n<b>Key factors</b>\n${factors}` : null,
     sources ? `\n<b>Sources</b>\n${sources}` : null,
@@ -80,8 +82,12 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 // Portugal have scored in 9 straight home games…
 // Closest: Over 2.5 goals → Yes · Gemini 58% (medium) vs market 49%
 // counted as 53.5%, costs 52.1% → +2.7% · fees and price impact eat the edge
-const reviewedLines = ({ title, summary, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
-  const lines = [`${proposed ? "✅" : "➖"} <b>${escapeHtml(title)}</b>`, `<i>${escapeHtml(clip(summary, 180))}</i>`];
+const reviewedLines = ({ title, summary, reading, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
+  const lines = [
+    `${proposed ? "✅" : "➖"} <b>${escapeHtml(title)}</b>`,
+    `<i>${escapeHtml(clip(summary, 180))}</i>`,
+    `📏 ${escapeHtml(clip(reading, 140))}`,
+  ];
   if (proposed) {
     lines.push("Bet proposed, see above.");
   } else if (nearMiss) {
