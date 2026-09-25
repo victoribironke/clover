@@ -1,20 +1,22 @@
-import type { ExchangeName } from "@/exchanges/types.ts";
+import { marketKind } from "@/data/kind.ts";
+import type { ExchangeName, MarketEvent } from "@/exchanges/types.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
 import type { NearMiss } from "@/strategy/propose.ts";
 import { collection } from "./firestore.ts";
 
 export const saveAnalysis = async (
   exchange: ExchangeName,
-  eventId: string,
-  eventTitle: string,
+  event: MarketEvent,
   model: string,
   deepDive: DeepDive,
   verdict: { proposed: boolean; nearMiss: NearMiss | null },
 ) => {
   const ref = await collection("analyses").add({
     exchange,
-    eventId,
-    eventTitle,
+    eventId: event.id,
+    eventTitle: event.title,
+    category: event.category,
+    kind: marketKind(event),
     model,
     ...deepDive,
     ...verdict,
