@@ -8,4 +8,4 @@ export const firestore = new Firestore({ ignoreUndefinedProperties: true });
 // Local runs write to dev_* collections so they never touch production data
 const prefix = config.onCloudRun ? "" : "dev_";
 
-export const collection = (name: "bets" | "analyses" | "kv") => firestore.collection(`${prefix}${name}`);
+export const collection = (name: "bets" | "analyses" | "kv" | "studies") => firestore.collection(`${prefix}${name}`);
