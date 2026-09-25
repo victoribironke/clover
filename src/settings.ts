@@ -38,8 +38,8 @@ export const settings = {
 
   // --- Schedule when running locally ---
   // (on Cloud Run, Cloud Scheduler drives these; see .github/workflows/deploy-cloudrun.yml)
-  // 4 scans a day; the daily budget still caps spend
-  scanEveryMinutes: 360,
+  // 8 scans a day; the daily budget still caps spend
+  scanEveryMinutes: 180,
   tickEveryMinutes: 1,
 
   bayseBaseUrl: "https://relay.bayse.markets",
