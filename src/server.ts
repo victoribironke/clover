@@ -5,6 +5,7 @@ import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { proxyToPanel } from "@/lib/panel-proxy.ts";
 import { rememberOrigin } from "@/lib/self.ts";
 import { bot } from "@/telegram/bot.ts";
 
@@ -27,7 +28,8 @@ const runJob = async (name: string, job: () => Promise<unknown>) => {
   }
 };
 
-// Cloud Scheduler hits /jobs/scan and /jobs/tick; Telegram hits /telegram in webhook mode
+// The container's only public entry point. Cloud Scheduler hits /jobs/*, Telegram hits /telegram,
+// and every other path is passed through to the web panel (src/lib/panel-proxy.ts).
 export const startServer = () =>
   Bun.serve({
     port: config.port,
@@ -59,5 +61,6 @@ export const startServer = () =>
           authorizedCron(request) ? runJob("tick", () => runTick(exchange)) : new Response("unauthorized", { status: 401 }),
       },
     },
-    fetch: () => new Response("not found", { status: 404 }),
+    // everything else is the web panel, running next to the bot in the same container
+    fetch: (request) => proxyToPanel(request, config.onCloudRun ? "https" : "http"),
   });
