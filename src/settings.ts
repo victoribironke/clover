@@ -31,6 +31,9 @@ export const settings = {
   // in them that's decided by a person's choice or performance. Sports, politics, awards,
   // reality TV, culture and tech deals are left out. Names are matched uppercase.
   categories: ["CRYPTO", "FINANCE", "ECONOMY", "ECONOMICS", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS"],
+  // Market kinds (src/data/kind.ts) never bet on. Likes/views/reposts/followers can be pushed
+  // by anyone who buys bots, and Bayse voids them more often for manipulation.
+  excludedKinds: ["engagement"],
   // only consider events that resolve within this many hours (7 days), so capital isn't tied up for long
   maxHoursToResolve: 168,
   // trading must stay open at least this long: the cancel window plus a margin to place the bet
@@ -41,6 +44,8 @@ export const settings = {
   // 8 scans a day; the daily budget still caps spend
   scanEveryMinutes: 180,
   tickEveryMinutes: 1,
+  // late-price study: records settled markets (no Gemini); must stay under 11 hours (see src/jobs/study.ts)
+  studyEveryMinutes: 360,
 
   bayseBaseUrl: "https://relay.bayse.markets",
 } as const;
