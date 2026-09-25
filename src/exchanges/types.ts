@@ -40,6 +40,10 @@ export type MarketEvent = {
   status: EventStatus;
   closingDate: string | null;
   resolutionDate: string | null;
+  // when trading opened; set on time-boxed events (e.g. hourly FX/crypto series)
+  openingDate: string | null;
+  // when the exchange actually settled it (resolved/cancelled events only)
+  resolvedAt: string | null;
   liquidity: number;
   totalVolume: number;
   supportedCurrencies: Currency[];
@@ -82,6 +86,9 @@ export type OrderQuery = {
   sinceIso: string;
 };
 
+// outcome1 ("YES") price over time, per market id; t is epoch ms
+export type PriceHistory = Record<string, { t: number; p: number }[]>;
+
 export type Exchange = {
   name: ExchangeName;
   currency: Currency;
@@ -94,4 +101,8 @@ export type Exchange = {
   // our BUY orders that actually bought something (filled, partly filled, or resting on the book)
   findOrders: (query: OrderQuery) => Promise<PlacedOrder[]>;
   getAvailableBalance: () => Promise<number>;
+  // newest first, stopping once events settled before `since`
+  listSettledEvents: (status: "resolved" | "cancelled", since: Date) => Promise<MarketEvent[]>;
+  // recent price paths; Bayse keeps 1-minute points for the last 12 hours
+  priceHistory: (eventId: string) => Promise<PriceHistory>;
 };
