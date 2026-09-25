@@ -86,6 +86,8 @@ export type OrderQuery = {
   sinceIso: string;
 };
 
+export type Wallet = { available: number; pending: number };
+
 // outcome1 ("YES") price over time, per market id; t is epoch ms
 export type PriceHistory = Record<string, { t: number; p: number }[]>;
 
@@ -101,6 +103,8 @@ export type Exchange = {
   // our BUY orders that actually bought something (filled, partly filled, or resting on the book)
   findOrders: (query: OrderQuery) => Promise<PlacedOrder[]>;
   getAvailableBalance: () => Promise<number>;
+  // the real wallet, in `currency`: available to trade, and pending (e.g. deposits clearing)
+  getWallet: () => Promise<Wallet>;
   // newest first, stopping once events settled before `since`
   listSettledEvents: (status: "resolved" | "cancelled", since: Date) => Promise<MarketEvent[]>;
   // recent price paths; Bayse keeps 1-minute points for the last 12 hours
