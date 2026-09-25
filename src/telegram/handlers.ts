@@ -37,7 +37,8 @@ export const registerHandlers = () => {
   bot.command("bets", async (ctx) => {
     const bets = await listBets(["pending", "placing", "placed"], 30);
     const text = bets.length ? bets.map(statusLine).join("\n") : "No open bets.";
-    await ctx.reply(text, { parse_mode: "HTML" });
+    // one tappable link per bet; previews would just show the first market
+    await ctx.reply(text, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
   });
 
   bot.command("pause", async (ctx) => {
