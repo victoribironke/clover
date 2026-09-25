@@ -5,7 +5,7 @@ A betting assistant for prediction markets. It scans [Bayse Markets](https://doc
 ## How it works
 
 ```
-every 6h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
+every 3h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -65,7 +65,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 4. registers the Telegram webhook
 5. creates or updates the Cloud Scheduler jobs:
    - tick every 5 minutes
-   - scan every 6 hours (00:00, 06:00, 12:00, 18:00 WAT)
+   - scan every 3 hours (00:00, 03:00, 06:00 … 21:00 WAT)
 
 Send `/status` to your bot to check it's alive.
 
