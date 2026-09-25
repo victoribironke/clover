@@ -1,4 +1,6 @@
 import type { Bet } from "@/db/bets.ts";
+import { eventUrl } from "@/exchanges/links.ts";
+import type { ExchangeName } from "@/exchanges/types.ts";
 import type { ScanReport } from "@/jobs/scan.ts";
 import { describeError } from "@/lib/errors.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
@@ -29,6 +31,13 @@ export const lagosTime = (iso: string) =>
 
 const tag = (bet: Pick<Bet, "dryRun">) => (bet.dryRun ? " <i>(paper)</i>" : "");
 
+// Bold event title that opens the market on the exchange
+export const eventLink = (exchange: ExchangeName, eventId: string, title: string) =>
+  `<a href="${escapeHtml(eventUrl(exchange, eventId))}"><b>${escapeHtml(title)}</b></a>`;
+
+export const betLink = (bet: Pick<Bet, "exchange" | "eventId" | "eventTitle">) =>
+  eventLink(bet.exchange, bet.eventId, bet.eventTitle);
+
 export const proposalMessage = (bet: Bet, research: DeepDive) => {
   const sources = research.sources
     .slice(0, 4)
@@ -41,7 +50,7 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
 
   return [
     `🎯 <b>New bet</b>${tag(bet)}`,
-    `<b>${escapeHtml(bet.eventTitle)}</b>`,
+    betLink(bet),
     bet.marketTitle !== bet.eventTitle ? `Market: ${escapeHtml(bet.marketTitle)}` : null,
     `Pick: <b>${escapeHtml(bet.outcomeLabel)}</b>`,
     "",
@@ -82,9 +91,9 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 // Portugal have scored in 9 straight home games…
 // Closest: Over 2.5 goals → Yes · Gemini 58% (medium) vs market 49%
 // counted as 53.5%, costs 52.1% → +2.7% · fees and price impact eat the edge
-const reviewedLines = ({ title, summary, reading, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
+const reviewedLines = ({ exchange, eventId, title, summary, reading, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
   const lines = [
-    `${proposed ? "✅" : "➖"} <b>${escapeHtml(title)}</b>`,
+    `${proposed ? "✅" : "➖"} ${eventLink(exchange, eventId, title)}`,
     `<i>${escapeHtml(clip(summary, 180))}</i>`,
     `📏 ${escapeHtml(clip(reading, 140))}`,
   ];
@@ -132,7 +141,7 @@ export const statusLine = (bet: Bet) => {
     failed: "⚠️",
   };
   const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl)}` : "";
-  return `${icon[bet.status]} ${escapeHtml(bet.eventTitle)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
+  return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
 };
 
 export type Spend = { today: number; month: number; dailyBudget: number };
