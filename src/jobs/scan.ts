@@ -27,7 +27,7 @@ export type ScanReport = {
   researched: number;
   proposed: number;
   // what each deep dive concluded, bet or not
-  reviewed: { title: string; summary: string; proposed: boolean; nearMiss: NearMiss | null }[];
+  reviewed: { title: string; summary: string; reading: string; proposed: boolean; nearMiss: NearMiss | null }[];
   // events whose research or pricing threw; the scan carries on without them
   failed: { title: string; error: unknown }[];
   skippedReason?: string;
@@ -98,7 +98,13 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
           proposed: Boolean(proposal),
           nearMiss,
         });
-        reviewed.push({ title: event.title, summary: research.summary, proposed: Boolean(proposal), nearMiss });
+        reviewed.push({
+          title: event.title,
+          summary: research.summary,
+          reading: research.reading,
+          proposed: Boolean(proposal),
+          nearMiss,
+        });
         if (!proposal) {
           log.info("no edge", { eventId: event.id, title: event.title, nearMiss });
           continue;
