@@ -5,11 +5,13 @@ import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
+import { loadStudies } from "@/jobs/study.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
+import { summarize } from "@/study/stats.ts";
 import { bot } from "./bot.ts";
-import { bankrollMessage, statusLine } from "./format.ts";
+import { bankrollMessage, statusLine, studyMessage } from "./format.ts";
 
 const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
 Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.
@@ -17,6 +19,7 @@ Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes t
 /status: bankroll and profit
 /bets: pending and open bets
 /scan: run a scan now
+/study: how prices behave near the end, and void rates by type
 /pause: stop scanning and placing
 /resume: start again`;
 
@@ -32,6 +35,10 @@ export const registerHandlers = () => {
     ]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
     await ctx.reply(bankrollMessage(bankroll, paused, spend), { parse_mode: "HTML" });
+  });
+
+  bot.command("study", async (ctx) => {
+    await ctx.reply(studyMessage(summarize(await loadStudies())), { parse_mode: "HTML" });
   });
 
   bot.command("bets", async (ctx) => {
