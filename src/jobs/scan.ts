@@ -1,8 +1,9 @@
+import { marketKind } from "@/data/kind.ts";
 import { recentlyAnalyzedEventIds, saveAnalysis } from "@/db/analyses.ts";
 import { activeBetEventIds, createBet, updateBet } from "@/db/bets.ts";
 import { isPaused, releaseLock, tryLock } from "@/db/kv.ts";
 import { spendToday } from "@/db/spend.ts";
-import type { Exchange, MarketEvent } from "@/exchanges/types.ts";
+import type { Exchange, ExchangeName } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { isGeminiUnavailable } from "@/llm/gemini.ts";
 import { deepDive } from "@/research/deep-dive.ts";
@@ -27,7 +28,15 @@ export type ScanReport = {
   researched: number;
   proposed: number;
   // what each deep dive concluded, bet or not
-  reviewed: { title: string; summary: string; reading: string; proposed: boolean; nearMiss: NearMiss | null }[];
+  reviewed: {
+    exchange: ExchangeName;
+    eventId: string;
+    title: string;
+    summary: string;
+    reading: string;
+    proposed: boolean;
+    nearMiss: NearMiss | null;
+  }[];
   // events whose research or pricing threw; the scan carries on without them
   failed: { title: string; error: unknown }[];
   skippedReason?: string;
@@ -94,11 +103,13 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
         // re-read prices: research can take minutes and the market may have moved
         const fresh = await exchange.getEvent(event.id);
         const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current);
-        const analysisId = await saveAnalysis(exchange.name, event.id, event.title, settings.model, research, {
+        const analysisId = await saveAnalysis(exchange.name, event, settings.model, research, {
           proposed: Boolean(proposal),
           nearMiss,
         });
         reviewed.push({
+          exchange: exchange.name,
+          eventId: event.id,
           title: event.title,
           summary: research.summary,
           reading: research.reading,
@@ -117,6 +128,8 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
           marketId: proposal.market.id,
           outcomeId: proposal.outcome.id,
           eventTitle: fresh.title,
+          category: fresh.category,
+          kind: marketKind(fresh),
           marketTitle: proposal.market.title,
           outcomeLabel: proposal.outcome.label,
           analysisId,
