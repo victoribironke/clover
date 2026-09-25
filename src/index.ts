@@ -1,5 +1,5 @@
 import { config } from "@/config.ts";
-import { releaseHeldLocks } from "@/db/kv.ts";
+import { publishSettings, releaseHeldLocks } from "@/db/kv.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
@@ -39,6 +39,8 @@ const main = async () => {
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
   process.once("SIGINT", () => void shutdown("SIGINT"));
   registerHandlers();
+  // best effort: the web panel falls back to defaults if this fails
+  await publishSettings({ ...settings }).catch((error) => log.warn("publish settings failed", { error: errorMessage(error) }));
   const server = startServer();
   log.info("server listening", { port: server.port, cloudRun: config.onCloudRun, dryRun: settings.dryRun });
 
