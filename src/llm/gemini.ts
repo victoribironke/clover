@@ -22,8 +22,9 @@ export const generate = async <T>(request: StructuredRequest<T>): Promise<Struct
     contents: request.prompt,
     config: {
       systemInstruction: request.system,
-      // Gemini 3 allows search grounding and a JSON schema in the same call
-      tools: request.webSearch ? [{ googleSearch: {} }] : undefined,
+      // Gemini 3 allows search grounding, URL reading and a JSON schema in the same call.
+      // URL context lets the model open data pages named in the prompt; their text is billed as input.
+      tools: request.webSearch ? [{ googleSearch: {} }, { urlContext: {} }] : undefined,
       responseMimeType: "application/json",
       responseJsonSchema: request.jsonSchema,
       maxOutputTokens: request.maxOutputTokens,
