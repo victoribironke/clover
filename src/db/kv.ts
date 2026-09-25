@@ -5,6 +5,10 @@ const kv = () => collection("kv");
 export const isPaused = async () => (await kv().doc("paused").get()).get("value") === true;
 export const setPaused = (paused: boolean) => kv().doc("paused").set({ value: paused });
 
+// One-off markers, e.g. "this migration has run"
+export const hasFlag = async (name: string) => (await kv().doc(`flag-${name}`).get()).exists;
+export const setFlag = (name: string) => kv().doc(`flag-${name}`).set({ at: new Date().toISOString() });
+
 export type LockResult = { acquired: true } | { acquired: false; startedAt: number; until: number };
 
 // locks this process holds, so a shutdown can hand them back (see releaseHeldLocks)
