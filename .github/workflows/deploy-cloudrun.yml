@@ -12,6 +12,9 @@ on:
       - "bun.lock"
       - "tsconfig.json"
       - "Dockerfile"
+      - ".dockerignore"
+      - "start.sh"
+      - "web/**"
       - ".github/workflows/deploy-cloudrun.yml"
   workflow_dispatch:
 
@@ -38,11 +41,18 @@ jobs:
           echo "$HOME/.bun/bin" >> $GITHUB_PATH # Add Bun to PATH
 
       # A bot that moves money shouldn't ship with failing tests or type errors
-      - name: Typecheck and test
+      - name: Typecheck and test (bot)
         run: |
           bun install --frozen-lockfile
           bun run typecheck
           bun test
+
+      - name: Typecheck and test (web panel)
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun run test
 
       - name: Authenticate Google Cloud CLI
         uses: google-github-actions/auth@v2
@@ -80,7 +90,9 @@ jobs:
       #   alternative (--no-cpu-throttling) bills every second the instance is up; with a tick every
       #   5 minutes that is 24/7, about $44/month. Long work (scans) runs inside its own request.
       # --timeout=3600: a scan request stays open for the whole scan, which can take many minutes
-      # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET
+      # --memory=1Gi: two runtimes in one container (bot on Bun, panel on Node)
+      # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET;
+      #   the panel does its own Google sign-in
       # --service-account: runs as clover-runtime, which only has Firestore access
       # Only secrets go here; every other setting lives in src/settings.ts
       - name: Deploy to Cloud Run
@@ -90,7 +102,7 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
-          flags: --allow-unauthenticated --max-instances=1 --cpu-throttling --timeout=3600 --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          flags: --allow-unauthenticated --max-instances=1 --cpu-throttling --timeout=3600 --memory=1Gi --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
           env_vars_update_strategy: overwrite
           env_vars: |-
             BAYSE_PUBLIC_KEY=${{ secrets.BAYSE_PUBLIC_KEY }}
@@ -99,6 +111,9 @@ jobs:
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
             APP_SECRET=${{ secrets.APP_SECRET }}
+            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            AUTH_GOOGLE_ID=${{ secrets.AUTH_GOOGLE_ID }}
+            AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
 
       - name: Set Telegram Webhook
         run: |
