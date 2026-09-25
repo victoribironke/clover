@@ -1,7 +1,7 @@
 import { listBets, updateBet, type Bet } from "@/db/bets.ts";
 import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
-import { escapeHtml, money, pct } from "@/telegram/format.ts";
+import { betLink, escapeHtml, money, pct } from "@/telegram/format.ts";
 import { clearButtons, notify } from "@/telegram/notify.ts";
 
 // Placing a bet takes seconds. A bet still "placing" after this long was claimed by an
@@ -10,7 +10,7 @@ const STUCK_AFTER_MS = 10 * 60_000;
 // allow for clock differences between us and Bayse when matching orders to the claim time
 const CLOCK_SKEW_MS = 2 * 60_000;
 
-const label = (bet: Bet) => `<b>${escapeHtml(bet.eventTitle)}</b> → ${escapeHtml(bet.outcomeLabel)}`;
+const label = (bet: Bet) => `${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)}`;
 
 const recoverPaper = async (bet: Bet) => {
   // nothing was sent anywhere, so it's safe to queue it again; the next tick re-quotes it
