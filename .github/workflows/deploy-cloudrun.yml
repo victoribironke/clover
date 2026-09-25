@@ -121,3 +121,5 @@ jobs:
           }
           upsert clover-tick "*/5 * * * *" /jobs/tick 600s
           upsert clover-scan "0 */3 * * *" /jobs/scan 1800s
+          # late-price study: records how settled markets were priced near the end (no Gemini)
+          upsert clover-study "30 */6 * * *" /jobs/study 1800s
