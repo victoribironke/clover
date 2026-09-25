@@ -1,3 +1,4 @@
+import type { MarketKind } from "@/data/kind.ts";
 import type { Currency, ExchangeName } from "@/exchanges/types.ts";
 import { collection, firestore } from "./firestore.ts";
 
@@ -27,6 +28,10 @@ export type Bet = {
   marketId: string;
   outcomeId: string;
   eventTitle: string;
+  // the exchange's own category, e.g. "SOCIAL MEDIA" (optional: bets from before 2026-09-25 are backfilled)
+  category?: string;
+  // what the market measures, for comparing results by type
+  kind?: MarketKind;
   marketTitle: string;
   outcomeLabel: string;
   analysisId: string | null;
@@ -56,8 +61,25 @@ export type NewBet = Omit<
 >;
 
 type BetPatch = Partial<
-  Pick<Bet, "status" | "executeAt" | "orderId" | "fillPrice" | "shares" | "pnl" | "error" | "telegramMessageId" | "stake" | "quotedPrice" | "expectedReturn">
+  Pick<
+    Bet,
+    | "status"
+    | "executeAt"
+    | "orderId"
+    | "fillPrice"
+    | "shares"
+    | "pnl"
+    | "error"
+    | "telegramMessageId"
+    | "stake"
+    | "quotedPrice"
+    | "expectedReturn"
+    | "category"
+    | "kind"
+  >
 >;
+
+export const ALL_STATUSES: BetStatus[] = ["pending", "placing", "placed", "won", "lost", "void", "cancelled", "skipped", "failed"];
 
 const LIVE: BetStatus[] = ["pending", "placing", "placed"];
 const SETTLED: BetStatus[] = ["won", "lost", "void"];
