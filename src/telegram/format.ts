@@ -1,6 +1,6 @@
 import type { Bet } from "@/db/bets.ts";
 import { eventUrl } from "@/exchanges/links.ts";
-import type { ExchangeName } from "@/exchanges/types.ts";
+import type { ExchangeName, Wallet } from "@/exchanges/types.ts";
 import type { ScanReport } from "@/jobs/scan.ts";
 import { describeError } from "@/lib/errors.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
@@ -179,14 +179,33 @@ export const studyMessage = (summary: StudySummary) => {
 
 export type Spend = { today: number; month: number; dailyBudget: number };
 
-export const bankrollMessage = (bankroll: Bankroll, paused: boolean, spend: Spend) =>
+// The real Bayse wallet, next to the bot's own numbers. Capital is a ceiling, not the balance:
+// the bot never works with more than capital, whatever the wallet holds.
+const walletLines = (wallet: Wallet | null, bankroll: Bankroll) => {
+  if (!wallet) return ["Bayse wallet: <i>couldn't read it right now</i>"];
+  const pending = wallet.pending > 0 ? ` (+${money(wallet.pending)} pending)` : "";
+  const lines = [`Bayse wallet: <b>${money(wallet.available)}</b>${pending}`];
+  if (bankroll.dryRun) {
+    lines.push("<i>Real money, untouched while paper trading.</i>");
+  } else if (wallet.available + bankroll.exposure < bankroll.capital) {
+    lines.push(`⚠️ Wallet plus money in play is below the ${money(bankroll.capital)} capital: the bot works with what's there.`);
+  } else {
+    lines.push(`${money(Math.max(0, wallet.available + bankroll.exposure - bankroll.capital))} of it sits outside the bot's capital.`);
+  }
+  return lines;
+};
+
+export const bankrollMessage = (bankroll: Bankroll, paused: boolean, spend: Spend, wallet: Wallet | null) =>
   [
     `<b>Clover</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
-    `Capital: ${money(bankroll.capital)}`,
+    `Capital (ceiling): ${money(bankroll.capital)}`,
     `Working bankroll: ${money(bankroll.bankroll)}`,
     `In play: ${money(bankroll.exposure)}`,
     `Free to bet: ${money(bankroll.deployable)}`,
     `Realized P&L: ${money(bankroll.realizedPnl)}`,
     `Withdrawable profit: <b>${money(bankroll.withdrawable)}</b>`,
+    "",
+    ...walletLines(wallet, bankroll),
+    "",
     `Research spend: ${usd(spend.today)} today (budget ${usd(spend.dailyBudget)}) · ${usd(spend.month)} this month`,
   ].join("\n");
