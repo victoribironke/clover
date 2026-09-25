@@ -7,6 +7,17 @@ A read-only admin panel for the Clover bot. Telegram stays where everything happ
 - **Sign-in:** Google via Auth.js, limited to the addresses in `src/settings.ts` (`allowedEmails`). Every panel page checks the session before reading data.
 - **Data:** the bot's production collections (`bets`, `kv`, …). Capital and paper/live mode come from the settings the bot publishes to `kv/settings` on every start.
 
+## Pages
+
+| Page | What it answers |
+|---|---|
+| **Overview** | P&L, withdrawable profit, win rate, return on stakes, bankroll curve, the real Bayse wallet, recent results |
+| **Bets** | Every bet, filtered by paper/live, status and market type. Each opens a detail page with the research behind it (📏 reading, summary, sources) |
+| **Market types** | Win rate, void rate and return per type (weather, post counts, streams, …): which markets actually make money |
+| **Calibration** | When the bot said 70%, did it win 70% of the time? It also compares the bot's probabilities with the prices it paid (Brier score): is the research beating the market? |
+| **Research** | Every deep dive, bet or not, with the near-miss and why it passed, plus research spend |
+| **Study** | The late-price study: are prices fair 10 minutes before measurement, and void rates by type |
+
 ## Secrets
 
 Environment variables are secrets only:
