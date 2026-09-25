@@ -5,6 +5,11 @@ const kv = () => collection("kv");
 export const isPaused = async () => (await kv().doc("paused").get()).get("value") === true;
 export const setPaused = (paused: boolean) => kv().doc("paused").set({ value: paused });
 
+// A copy of src/settings.ts that the web panel reads, so capital, paper/live mode and the rest
+// have one source of truth. Written on every start, i.e. on every deploy.
+export const publishSettings = (settings: Record<string, unknown>) =>
+  kv().doc("settings").set({ ...settings, publishedAt: new Date().toISOString() });
+
 // One-off markers, e.g. "this migration has run"
 export const hasFlag = async (name: string) => (await kv().doc(`flag-${name}`).get()).exists;
 export const setFlag = (name: string) => kv().doc(`flag-${name}`).set({ at: new Date().toISOString() });
