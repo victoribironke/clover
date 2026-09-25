@@ -19,3 +19,5 @@ Prediction-market betting bot. Scans Bayse (NGN), researches events with Gemini 
 - Research spend is capped by `settings.dailyResearchBudgetUsd`. If the model changes, update `src/llm/pricing.ts`.
 - Keep LLM prompts and JSON schemas terse. Use short refs (`e1`, `m1`), not UUIDs. Take sources from search metadata, not from model output.
 - Research reasons from the current number, not history. `src/data/` fetches hard data before the model runs (Open-Meteo ensemble for weather, public chart mirrors for streams). The model must report a live `reading`; without one, confidence is capped at "low" ("medium" for recurring post counts) in `src/research/deep-dive.ts`.
+- Engagement markets (likes/views/reposts/followers) are never bet on (`settings.excludedKinds`): they're manipulable and void often.
+- The late-price study (`src/jobs/study.ts`, `src/study/`) is research only. It never places bets. Bayse's price history reports `p = 0` for untraded order-book markets; those points are dropped as "no price".
