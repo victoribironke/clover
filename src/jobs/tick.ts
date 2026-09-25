@@ -1,5 +1,5 @@
 import type { Exchange } from "@/exchanges/types.ts";
-import { releaseLock, tryLock } from "@/db/kv.ts";
+import { publish, releaseLock, tryLock } from "@/db/kv.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { backfillBetKinds } from "./backfill.ts";
 import { runExecute } from "./execute.ts";
@@ -16,6 +16,11 @@ export const runTick = async (exchange: Exchange) => {
     const recovered = await recoverStuckBets(exchange);
     const executed = await runExecute(exchange);
     const settled = await runSettle(exchange);
+    // the real Bayse wallet, for the panel (read-only; recorded in paper mode too)
+    await exchange
+      .getWallet()
+      .then((wallet) => publish("wallet", wallet))
+      .catch((error) => log.warn("wallet snapshot failed", { error: errorMessage(error) }));
     // one-off data migration; a no-op once it has run, and never allowed to break the tick
     await backfillBetKinds(exchange).catch((error) => log.error("backfill failed", { error: errorMessage(error) }));
     return { recovered, executed, settled };
