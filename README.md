@@ -105,7 +105,7 @@ Running locally with the production bot token switches Telegram from the webhook
 
 | Command              | What it does                                                              |
 | -------------------- | ------------------------------------------------------------------------- |
-| `/status`            | Capital, money in play, realized P&L, withdrawable profit, research spend |
+| `/status`            | Capital, money in play, realized P&L, withdrawable profit, your real Bayse wallet balance, research spend |
 | `/bets`              | Pending and open bets                                                     |
 | `/scan`              | Run a scan now                                                            |
 | `/study`             | Late-price study: are prices fair near the end, void rates by market type |
