@@ -95,7 +95,7 @@ const toPlacedOrder = (order: RawOrder): PlacedOrder => ({
 const DEAD_ORDER_STATUSES = new Set(["rejected", "cancelled", "expired"]);
 
 type RawAssets = {
-  assets: { symbol: string; availableBalance: number }[];
+  assets: { symbol: string; availableBalance: number; pendingBalance?: number }[];
 };
 
 const CURRENCY: Currency = "NGN";
@@ -266,10 +266,14 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     );
   };
 
-  const getAvailableBalance = async () => {
+  // https://docs.bayse.markets/api-reference/wallet/get-assets
+  const getWallet: Exchange["getWallet"] = async () => {
     const { assets } = await http.request<RawAssets>("GET", "/v1/wallet/assets", { auth: "read" });
-    return assets.find((asset) => asset.symbol === CURRENCY)?.availableBalance ?? 0;
+    const asset = assets.find((item) => item.symbol === CURRENCY);
+    return { available: asset?.availableBalance ?? 0, pending: asset?.pendingBalance ?? 0 };
   };
+
+  const getAvailableBalance = async () => (await getWallet()).available;
 
   return {
     name: "bayse",
@@ -281,6 +285,7 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     placeOrder,
     findOrders,
     getAvailableBalance,
+    getWallet,
     listSettledEvents,
     priceHistory,
   };
