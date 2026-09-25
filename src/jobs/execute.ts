@@ -5,13 +5,13 @@ import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { expectedReturn } from "@/strategy/sizing.ts";
-import { escapeHtml, failureMessage, money, pct } from "@/telegram/format.ts";
+import { betLink, escapeHtml, failureMessage, money, pct } from "@/telegram/format.ts";
 import { clearButtons, notify } from "@/telegram/notify.ts";
 
 const skip = async (bet: Bet, reason: string) => {
   await updateBet(bet.id, { status: "skipped", error: reason }, ["placing"]);
   await clearButtons(bet.telegramMessageId);
-  await notify(`⏭️ Skipped <b>${escapeHtml(bet.eventTitle)}</b> → ${escapeHtml(bet.outcomeLabel)}\n${escapeHtml(reason)}`);
+  await notify(`⏭️ Skipped ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)}\n${escapeHtml(reason)}`);
 };
 
 // Re-check everything right before money moves: the market may have closed,
@@ -60,7 +60,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     });
     await clearButtons(bet.telegramMessageId);
     await notify(
-      `✅ ${bet.dryRun ? "Paper bet" : "Bet"} placed: <b>${escapeHtml(bet.eventTitle)}</b> → <b>${escapeHtml(bet.outcomeLabel)}</b>\n` +
+      `✅ ${bet.dryRun ? "Paper bet" : "Bet"} placed: ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b>\n` +
         `${money(bet.stake)} at ${pct(order.avgPrice || quote.avgPrice)} · expected ${pct(edge, true)}`,
     );
     log.info("bet placed", { betId: bet.id, orderId: order.id, dryRun: bet.dryRun });
