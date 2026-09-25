@@ -17,6 +17,8 @@ every 5m   tick ─► place due bets (re-quote first) ─► settle resolved be
 ```
 
 - **Data-settled markets only.** It only bets on markets that settle on measurable public data: prices, exchange rates, temperatures, post and stream counts, chart positions, official statistics. Sports, politics, awards, reality TV and anything else decided by people is left out, first by category (`categories` in `src/settings.ts`) and then by the screening step. Markets must resolve within 7 days (`maxHoursToResolve`).
+- **No engagement markets.** Likes, views, reposts and follower counts are excluded (`excludedKinds` in `src/settings.ts`). Anyone who buys bots can move those numbers, and Bayse voids them more often.
+- **Late-price study.** Every 6 hours a job records how recently settled markets were priced in the final hour before their measurement time, plus voids. It makes no Gemini calls and moves no money. `/study` shows whether late prices are systematically off, and for which market types, before we build a closing-window strategy on it.
 - **Live data first.** Before research, the bot fetches hard data itself where it can: a 122-run weather-model ensemble for temperature markets, and public mirrors of the Spotify and Apple Music Nigeria charts. Gemini must report the current reading it based its estimate on, which is shown on every bet. Without a live reading, confidence is capped at low (medium for daily post counts), so history alone rarely triggers a bet.
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
@@ -67,6 +69,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 5. creates or updates the Cloud Scheduler jobs:
    - tick every 5 minutes
    - scan every 3 hours (00:00, 03:00, 06:00 … 21:00 WAT)
+   - late-price study every 6 hours (no Gemini, no money)
 
 Send `/status` to your bot to check it's alive.
 
@@ -105,6 +108,7 @@ Running locally with the production bot token switches Telegram from the webhook
 | `/status`            | Capital, money in play, realized P&L, withdrawable profit, research spend |
 | `/bets`              | Pending and open bets                                                     |
 | `/scan`              | Run a scan now                                                            |
+| `/study`             | Late-price study: are prices fair near the end, void rates by market type |
 | `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                    |
 
 ## Layout
