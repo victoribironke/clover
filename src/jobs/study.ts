@@ -1,9 +1,9 @@
 import { collection } from "@/db/firestore.ts";
-import { releaseLock, tryLock } from "@/db/kv.ts";
+import { publish, releaseLock, tryLock } from "@/db/kv.ts";
 import type { Exchange, MarketEvent, PriceHistory } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { anchorFor, buildStudy } from "@/study/build.ts";
-import type { Study } from "@/study/stats.ts";
+import { summarize, type Study } from "@/study/stats.ts";
 
 const HOUR = 3_600_000;
 // Bayse keeps 12 hours of 1-minute prices. Runs every 6 hours, looking back 11, so every event's
@@ -58,6 +58,8 @@ export const runStudy = async (exchange: Exchange) => {
         }
       }
     }
+    // the panel shows this summary rather than recomputing it
+    await publish("study-summary", summarize(await loadStudies()));
     return { recorded, failed };
   } finally {
     await releaseLock("study");
