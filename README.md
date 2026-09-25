@@ -111,6 +111,10 @@ Running locally with the production bot token switches Telegram from the webhook
 | `/study`             | Late-price study: are prices fair near the end, void rates by market type |
 | `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                    |
 
+## Web panel
+
+A read-only admin panel (results, bankroll curve, bets) lives in [`web/`](web/README.md). It runs in the same container as the bot, at https://clover-uhkg4fo2na-od.a.run.app.
+
 ## Layout
 
 ```
