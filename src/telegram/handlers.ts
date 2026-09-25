@@ -29,14 +29,16 @@ export const registerHandlers = () => {
   bot.command(["start", "help"], (ctx) => ctx.reply(HELP, { parse_mode: "HTML" }));
 
   bot.command("status", async (ctx) => {
-    const [bankroll, paused, today, month] = await Promise.all([
+    const [bankroll, paused, today, month, wallet] = await Promise.all([
       getBankroll(exchange),
       isPaused(),
       spendToday(),
       spendThisMonth(),
+      // read live; a Bayse hiccup shouldn't stop /status from answering
+      exchange.getWallet().catch(() => null),
     ]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
-    await ctx.reply(bankrollMessage(bankroll, paused, spend), { parse_mode: "HTML" });
+    await ctx.reply(bankrollMessage(bankroll, paused, spend, wallet), { parse_mode: "HTML" });
   });
 
   bot.command("study", async (ctx) => {
