@@ -68,7 +68,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     // an order error is not retried: it's safer to miss a bet than to place it twice
     await updateBet(bet.id, { status: "failed", error: errorMessage(error) });
     await clearButtons(bet.telegramMessageId);
-    await notify(failureMessage(`Could not place: ${bet.eventTitle} → ${bet.outcomeLabel}`, error));
+    await notify(failureMessage(`Could not place: ${bet.eventTitle} → ${bet.outcomeLabel}`, error), { level: "alert" });
     log.error("bet failed", { betId: bet.id, error: errorMessage(error) });
   }
 };
