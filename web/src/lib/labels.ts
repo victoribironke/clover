@@ -6,6 +6,7 @@ export const MARKET_KIND_LABELS: Record<string, string> = {
   chart: "Charts",
   price: "Prices",
   economy: "Economy",
+  sports: "Sports",
   other: "Other",
   unclassified: "Unclassified",
 };
