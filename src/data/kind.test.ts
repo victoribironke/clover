@@ -20,6 +20,8 @@ test.each<[string, string, MarketKind]>([
   ["Gold (XAUUSD) Up or Down on Sep 25?", "FINANCE", "price"],
   ["Will Nigeria’s Gross External Reserves Cross $56.5 Billion Before Q4 2026 Ends?", "ECONOMY", "economy"],
   ["Will Tinubu Post an Independence Day Message before 10AM October 1?", "SOCIAL MEDIA", "other"],
+  ["ENG vs ESP: Who Will Win?", "SPORTS", "sports"],
+  ["How Many Passes Will England Get vs Spain?", "SPORTS", "sports"],
 ])("%s → %s", (title, category, expected) => {
   expect(kind(title, category)).toBe(expected);
 });
