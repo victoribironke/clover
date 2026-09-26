@@ -7,9 +7,9 @@ import { parseWeatherQuestion } from "./weather.ts";
 // compared by type: e.g. "are weather bets really more profitable than post counts?"
 // "engagement" (likes, views, reposts, followers) is its own kind because anyone who buys bots
 // can move the number, and Bayse voids these more often for manipulation.
-export type MarketKind = "weather" | "post-count" | "engagement" | "streams" | "chart" | "price" | "economy" | "other";
+export type MarketKind = "weather" | "post-count" | "engagement" | "streams" | "chart" | "price" | "economy" | "sports" | "other";
 
-export const MARKET_KINDS: MarketKind[] = ["weather", "post-count", "engagement", "streams", "chart", "price", "economy", "other"];
+export const MARKET_KINDS: MarketKind[] = ["weather", "post-count", "engagement", "streams", "chart", "price", "economy", "sports", "other"];
 
 const ENGAGEMENT = /\b(likes?|views?|reposts?|retweets?|followers?|subscribers?|impressions?|comments?|reactions?)\b/i;
 
@@ -18,6 +18,8 @@ type Classifiable = Pick<MarketEvent, "title" | "category" | "resolutionDate" | 
 export const marketKind = (event: Classifiable): MarketKind => {
   const title = event.title;
   const category = event.category.toUpperCase();
+  // match results and match stats ("Total Shots", "How Many Passes") are sports, whatever their wording
+  if (category === "SPORTS" || category === "PLAYER STATS") return "sports";
   if (parseWeatherQuestion(event as MarketEvent) || /\b(temperature|rainfall|weather)\b/i.test(title)) return "weather";
   // before post counts: "likes on her latest post" mentions posts but measures engagement
   if (ENGAGEMENT.test(title)) return "engagement";
