@@ -5,7 +5,7 @@ A betting assistant for prediction markets. It scans [Bayse Markets](https://doc
 ## How it works
 
 ```
-every 3h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
+every 6h   scan ─► settle ─► filter ─► screen (1 Gemini call) ─► deep dive (Gemini + Google Search, per event)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -13,7 +13,7 @@ every 3h   scan ─► filter ─► screen (1 Gemini call) ─► deep dive (Ge
                                                              │
                                         Telegram: "New bet … places at 14:30 unless you cancel"
                                                      [❌ Cancel] [✅ Place now]
-every 5m   tick ─► place due bets (re-quote first) ─► settle resolved bets ─► P&L to Telegram
+23:30     daily summary ─► settle ─► one Telegram message with the day's bets, results and any problems
 ```
 
 - **Data-settled markets only.** It only bets on markets that settle on measurable public data: prices, exchange rates, temperatures, post and stream counts, chart positions, official statistics. Sports, politics, awards, reality TV and anything else decided by people is left out, first by category (`categories` in `src/settings.ts`) and then by the screening step. Markets must resolve within 7 days (`maxHoursToResolve`).
@@ -67,8 +67,8 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 3. deploys the service
 4. registers the Telegram webhook
 5. creates or updates the Cloud Scheduler jobs:
-   - tick every 5 minutes
-   - scan every 3 hours (00:00, 03:00, 06:00 … 21:00 WAT)
+   - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
+   - scan every 6 hours (00:00, 06:00, 12:00, 18:00 WAT)
    - late-price study every 6 hours (no Gemini, no money)
 
 Send `/status` to your bot to check it's alive.
@@ -106,6 +106,7 @@ Running locally with the production bot token switches Telegram from the webhook
 | Command              | What it does                                                              |
 | -------------------- | ------------------------------------------------------------------------- |
 | `/status`            | Capital, money in play, realized P&L, withdrawable profit, your real Bayse wallet balance, research spend |
+| `/summary`           | The last 24 hours: bets placed, results, open bets, research spend, problems |
 | `/bets`              | Pending and open bets                                                     |
 | `/scan`              | Run a scan now                                                            |
 | `/study`             | Late-price study: are prices fair near the end, void rates by market type |
