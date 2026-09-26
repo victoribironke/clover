@@ -3,6 +3,7 @@ import { config } from "@/config.ts";
 import { exchange } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
+import { runDailySummary } from "@/jobs/summary.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { proxyToPanel } from "@/lib/panel-proxy.ts";
@@ -55,6 +56,10 @@ export const startServer = () =>
       "/jobs/study": {
         POST: (request) =>
           authorizedCron(request) ? runJob("study", () => runStudy(exchange)) : new Response("unauthorized", { status: 401 }),
+      },
+      "/jobs/summary": {
+        POST: (request) =>
+          authorizedCron(request) ? runJob("summary", () => runDailySummary(exchange)) : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/tick": {
         POST: (request) =>
