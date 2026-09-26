@@ -5,7 +5,7 @@ export const settings = {
   // the only Google accounts allowed in; everyone else is turned away even if Google signs them in
   allowedEmails: ["ibikidsfc56@gmail.com"],
   // used until the bot has published its own settings to Firestore (kv/settings)
-  fallbackBotSettings: { dryRun: true, capitalNgn: 10_000, dailyResearchBudgetUsd: 0.25 },
+  fallbackBotSettings: { dryRun: true, capitalNgn: 10_000, dailyResearchBudgetUsd: 1 },
 } as const;
 
 export const isAllowedEmail = (email: string | null | undefined) =>
