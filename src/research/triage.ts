@@ -7,7 +7,7 @@ import { generate } from "@/llm/gemini.ts";
 import { settings } from "@/settings.ts";
 import { isTradeable, nowUtc } from "./describe-event.ts";
 
-const SYSTEM = `Pick prediction markets worth web research. Only pick markets that settle on a measurable number from a public data source: a price, exchange rate, temperature, post/stream count, chart position, or official statistic. Never pick markets decided by a person's choice or performance (awards, evictions, guests, retirements, match results, elections), and never likes, views, reposts or follower counts (anyone can buy those with bots).
+const SYSTEM = `Pick prediction markets worth web research. Only pick markets that settle on a measurable number from a public data source: a price, exchange rate, temperature, post/stream count, chart position, or official statistic. Sports matches are fine too (results, goals, shots, passes, corners): favor ones with bookmaker lines to compare against. Never pick markets decided by a person's choice (awards, evictions, guests, retirements, elections), and never likes, views, reposts or follower counts (anyone can buy those with bots).
 Best targets, pick these first: weather readings (forecast models are strong a day or two out) and post counts by an account or person (posting habits are steady). Then chart positions, stream counts and price thresholds.
 Favor ones where current data, trends, or forecasts can beat the crowd, at mid-range prices. Skip pure noise: 15-minute, hourly and daily up/down moves are close to coin flips. Reply with refs only, best first. Picking none is fine.`;
 
