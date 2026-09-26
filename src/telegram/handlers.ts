@@ -6,6 +6,7 @@ import { exchange } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
+import { buildDailySummary } from "@/jobs/summary.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { selfOrigin } from "@/lib/self.ts";
 import { settings } from "@/settings.ts";
@@ -16,9 +17,14 @@ import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./for
 import { notify } from "./notify.ts";
 
 const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
-Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.
+${
+  settings.quiet
+    ? "🔕 Muted: bets are placed without messages, and a summary arrives daily at 23:30."
+    : `Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.`
+}
 
 /status: bankroll and profit
+/summary: the last 24 hours (also sent daily at 23:30)
 /bets: pending and open bets
 /scan: run a scan now
 /study: how prices behave near the end, and void rates by type
@@ -39,6 +45,10 @@ export const registerHandlers = () => {
     ]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
     await ctx.reply(bankrollMessage(bankroll, paused, spend, wallet), { parse_mode: "HTML" });
+  });
+
+  bot.command("summary", async (ctx) => {
+    await ctx.reply(await buildDailySummary(exchange), { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
   });
 
   bot.command("study", async (ctx) => {
@@ -72,7 +82,7 @@ export const registerHandlers = () => {
       void fetch(`${origin}/jobs/scan?manual=1`, {
         method: "POST",
         headers: { authorization: `Bearer ${config.APP_SECRET}` },
-      }).catch((error) => notify(failureMessage("Couldn't start the scan", error)));
+      }).catch((error) => notify(failureMessage("Couldn't start the scan", error), { level: "always" }));
     } else {
       void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
     }
