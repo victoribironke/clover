@@ -31,3 +31,7 @@ export const recentlyAnalyzedEventIds = async (exchange: ExchangeName, sinceIso:
   const snapshot = await collection("analyses").where("createdAt", ">=", sinceIso).select("exchange", "eventId").get();
   return new Set(snapshot.docs.filter((doc) => doc.get("exchange") === exchange).map((doc) => doc.get("eventId") as string));
 };
+
+// How many deep dives ran since `sinceIso` (a count query: one read, not one per document)
+export const countAnalysesSince = async (sinceIso: string) =>
+  (await collection("analyses").where("createdAt", ">=", sinceIso).count().get()).data().count;
