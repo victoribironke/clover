@@ -116,7 +116,7 @@ export const scanReportMessage = (report: ScanReport) => {
   if (report.skippedReason) return `⏸ <b>Scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
   const lines = [
     `🔎 <b>Scan done</b>`,
-    `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>`,
+    `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>${report.placed ? ` · ${report.placed} placed` : ""}`,
   ];
   if (report.reviewed.length > 0) lines.push("", "📋 <b>Researched</b>");
   for (const item of report.reviewed) lines.push("", reviewedLines(item));
@@ -174,6 +174,59 @@ export const studyMessage = (summary: StudySummary) => {
     );
   }
   lines.push("", "<i>Needs a few hundred markets before it means much.</i>");
+  return lines.join("\n");
+};
+
+export type DailySummary = {
+  placed: Bet[];
+  settled: Bet[];
+  open: Bet[];
+  bankroll: Bankroll;
+  wallet: Wallet | null;
+  spentUsd: number;
+  deepDives: number;
+  alerts: { at: string; text: string }[];
+};
+
+const LIST_LIMIT = 8;
+const more = (total: number) => (total > LIST_LIMIT ? [`<i>…and ${total - LIST_LIMIT} more</i>`] : []);
+const sum = (bets: Bet[], pick: (bet: Bet) => number) => bets.reduce((total, bet) => total + pick(bet), 0);
+const signedMoney = (amount: number) => `${amount > 0 ? "+" : ""}${money(amount)}`;
+
+// 📒 The last 24 hours in one message, for quiet mode
+export const dailySummaryMessage = ({ placed, settled, open, bankroll, wallet, spentUsd, deepDives, alerts }: DailySummary) => {
+  const won = settled.filter((bet) => bet.status === "won");
+  const lost = settled.filter((bet) => bet.status === "lost");
+  const voided = settled.filter((bet) => bet.status === "void");
+  const dayPnl = sum(settled, (bet) => bet.pnl ?? 0);
+  const icon = (bet: Bet) => (bet.status === "won" ? "🏆" : bet.status === "lost" ? "❌" : "↩️");
+
+  const lines = [`📒 <b>Daily summary</b> · last 24 hours${bankroll.dryRun ? " <i>(paper)</i>" : ""}`, ""];
+
+  lines.push(`<b>Placed:</b> ${placed.length} bets · ${money(sum(placed, (bet) => bet.stake))} staked`);
+  for (const bet of placed.slice(0, LIST_LIMIT)) {
+    lines.push(`• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`);
+  }
+  lines.push(...more(placed.length), "");
+
+  lines.push(`<b>Settled:</b> ${won.length} won · ${lost.length} lost · ${voided.length} void · P&L <b>${signedMoney(dayPnl)}</b>`);
+  for (const bet of settled.slice(0, LIST_LIMIT)) {
+    lines.push(`${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0)}`);
+  }
+  lines.push(...more(settled.length), "");
+
+  lines.push(
+    `<b>Open:</b> ${open.length} bets · ${money(sum(open, (bet) => bet.stake))} in play`,
+    `<b>Realized P&L:</b> ${signedMoney(bankroll.realizedPnl)} · withdrawable <b>${money(bankroll.withdrawable)}</b>`,
+    wallet ? `<b>Bayse wallet:</b> ${money(wallet.available)}` : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
+    `<b>Research:</b> ${deepDives} deep dives · ${usd(spentUsd)} today`,
+  );
+
+  if (alerts.length > 0) {
+    lines.push("", `⚠️ <b>${alerts.length} problem${alerts.length === 1 ? "" : "s"}</b>`);
+    for (const alert of alerts.slice(0, LIST_LIMIT)) lines.push(`• ${escapeHtml(alert.text)}`);
+    lines.push(...more(alerts.length));
+  }
   return lines.join("\n");
 };
 
