@@ -38,6 +38,7 @@ describe("stakeFor", () => {
     minOrderAmount: 100,
     kellyMultiplier: 0.25,
     maxBetFraction: 0.1,
+    minimumStakeFraction: 0,
   };
 
   test("quarter Kelly on a 20% edge", () => {
@@ -51,5 +52,21 @@ describe("stakeFor", () => {
   });
   test("below the market minimum means no bet", () => {
     expect(stakeFor({ ...base, probability: 0.51, price: 0.5 })).toBe(0);
+  });
+
+  // The Solana case from a real scan: 43.8% vs 38.5% sizes to ₦215, under the ₦500 minimum
+  const solana = { ...base, probability: 0.438, price: 0.385, minOrderAmount: 500, minimumStakeFraction: 0.05 };
+
+  test("rounds a small edge up to the market minimum when it's at most 5% of bankroll", () => {
+    expect(stakeFor(solana)).toBe(500);
+  });
+  test("not when the minimum is a bigger share of the bankroll", () => {
+    expect(stakeFor({ ...solana, bankroll: 5_000 })).toBe(0);
+  });
+  test("not when there's no free capital for it", () => {
+    expect(stakeFor({ ...solana, deployable: 300 })).toBe(0);
+  });
+  test("never for a bet with no edge", () => {
+    expect(stakeFor({ ...solana, probability: 0.38 })).toBe(0);
   });
 });
