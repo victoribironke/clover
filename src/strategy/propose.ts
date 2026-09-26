@@ -120,9 +120,10 @@ export const proposeBet = async (
         minOrderAmount: market.minOrderAmount,
         kellyMultiplier: settings.kellyFraction,
         maxBetFraction: settings.maxBetFraction,
+        minimumStakeFraction: settings.minimumStakeFraction,
       });
       if (stake === 0) {
-        miss(outcome.price, listedEdge, `stake would be under the ₦${market.minOrderAmount} minimum`);
+        miss(outcome.price, listedEdge, `stake would be under the ₦${market.minOrderAmount} minimum, which is too big a share of the bankroll`);
         continue;
       }
 
