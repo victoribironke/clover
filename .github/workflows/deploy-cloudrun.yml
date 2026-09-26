@@ -121,8 +121,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"url": "${{ steps.deploy.outputs.url }}/telegram", "secret_token": "${{ secrets.APP_SECRET }}"}'
 
-      # Create the two scheduler jobs on the first deploy, keep them pointed at the service afterwards.
-      # Scan every 3h (00:00, 03:00, 06:00 … 21:00 WAT) matches settings.scanEveryMinutes (used locally).
+      # Create the scheduler jobs on the first deploy, keep them pointed at the service afterwards.
+      # Scans every 6h (00:00, 06:00, 12:00, 18:00 WAT; matches settings.scanEveryMinutes) settle, research
+      # and place bets themselves. The daily summary at 23:30 WAT settles again and reports the day.
       - name: Configure Cloud Scheduler
         run: |
           upsert() {
@@ -136,7 +137,14 @@ jobs:
               gcloud scheduler jobs create http "$name" "${args[@]}" --headers="Authorization=Bearer ${{ secrets.APP_SECRET }}"
             fi
           }
-          upsert clover-tick "*/5 * * * *" /jobs/tick 600s
-          upsert clover-scan "0 */3 * * *" /jobs/scan 1800s
+          upsert clover-scan "0 */6 * * *" /jobs/scan 1800s
+          upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
+
+          # retired jobs: removing them from this list alone would leave them running
+          for retired in clover-tick; do
+            if gcloud scheduler jobs describe "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+              gcloud scheduler jobs delete "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" --quiet
+            fi
+          done
