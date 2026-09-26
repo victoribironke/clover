@@ -15,7 +15,7 @@ const label = (bet: Bet) => `${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)}
 const recoverPaper = async (bet: Bet) => {
   // nothing was sent anywhere, so it's safe to queue it again; the next tick re-quotes it
   if (!(await updateBet(bet.id, { status: "pending", error: "interrupted while placing; retried" }, ["placing"]))) return;
-  await notify(`↩️ Paper bet ${label(bet)} was interrupted while placing. It's queued again and will be re-checked on the next tick.`);
+  await notify(`↩️ Paper bet ${label(bet)} was interrupted while placing. It's queued again and will be re-checked on the next run.`);
 };
 
 const recoverLive = async (exchange: Exchange, bet: Bet) => {
@@ -47,6 +47,7 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
     await notify(
       `✅ Recovered: ${label(bet)}\nThe bot was interrupted while placing this bet, but the order did reach Bayse.\n` +
         `${money(bet.stake)} at ${pct(order.avgPrice || bet.quotedPrice)} · order <code>${escapeHtml(order.id)}</code>`,
+      { level: "alert" },
     );
     return;
   }
@@ -56,6 +57,7 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
   await clearButtons(bet.telegramMessageId);
   await notify(
     `⚠️ ${label(bet)} was interrupted before its order reached Bayse. Nothing was bought, and it won't be retried automatically.`,
+    { level: "alert" },
   );
 };
 
