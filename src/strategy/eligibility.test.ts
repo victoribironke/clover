@@ -65,12 +65,12 @@ describe("eligibleEvents", () => {
     expect(passes({ resolutionDate: inHours(24 * 5) })).toBe(true);
   });
   test("drops categories decided by people rather than data", () => {
-    for (const category of ["SPORTS", "PLAYER STATS", "POLITICS", "HEADIES", "BB NAIJA"]) {
+    for (const category of ["PLAYER STATS", "POLITICS", "HEADIES", "BB NAIJA"]) {
       expect(passes({ category, resolutionDate: inHours(5) })).toBe(false);
     }
   });
   test("keeps data-driven categories", () => {
-    for (const category of ["CRYPTO", "FINANCE", "ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS"]) {
+    for (const category of ["CRYPTO", "FINANCE", "ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS", "SPORTS"]) {
       expect(passes({ category, resolutionDate: inHours(5) })).toBe(true);
     }
   });
