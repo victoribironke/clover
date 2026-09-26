@@ -28,7 +28,7 @@ const shutdown = async (signal: string) => {
   try {
     const released = await releaseHeldLocks();
     if (released.includes("scan")) {
-      await notify("⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.");
+      await notify("⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.", { level: "alert" });
     }
   } finally {
     process.exit(0);
@@ -46,6 +46,7 @@ const main = async () => {
 
   await bot.api.setMyCommands([
     { command: "status", description: "Bankroll and profit" },
+    { command: "summary", description: "The last 24 hours" },
     { command: "bets", description: "Pending and open bets" },
     { command: "scan", description: "Run a scan now" },
     { command: "study", description: "Late-price study and void rates" },
