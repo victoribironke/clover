@@ -8,7 +8,7 @@ export const settings = {
   dryRun: true,
   // Muted: no per-bet Telegram messages. Problems are saved and everything is reported in one
   // daily summary (23:30 WAT). Your own /scan still answers. Set false to hear about every bet.
-  quiet: true,
+  quiet: false,
   // the bot only ever works with this much; anything above it is withdrawable profit
   capitalNgn: 10_000,
   // fraction of full Kelly to bet (0.25 = quarter Kelly)
