@@ -29,7 +29,7 @@ export const settings = {
   // one model for everything: screening and deep research (web search via Google)
   model: "gemini-3.8-flash",
   // hard cap on estimated Gemini spend per UTC day, in USD
-  dailyResearchBudgetUsd: 1,
+  dailyResearchBudgetUsd: 0.6,
   maxDeepDivesPerScan: 10,
   // don't re-research an event within this window; prices and data move, so re-check a few times a day
   researchCooldownHours: 8,
