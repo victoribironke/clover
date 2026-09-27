@@ -1,6 +1,7 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { config } from "@/config.ts";
 import { settings } from "@/settings.ts";
+import { parseModelJson } from "./json.ts";
 import type { Source, StructuredRequest, StructuredResult } from "./types.ts";
 
 // The SDK only retries when retryOptions is set. It then retries 408/429/500/502/503/504
@@ -35,7 +36,7 @@ export const generate = async <T>(request: StructuredRequest<T>): Promise<Struct
 
   const text = response.text;
   if (!text) throw new Error(`Gemini returned no text (finish: ${response.candidates?.[0]?.finishReason ?? "unknown"})`);
-  const data = request.parse.parse(JSON.parse(text));
+  const data = request.parse.parse(parseModelJson(text));
 
   const grounding = response.candidates?.[0]?.groundingMetadata;
   const sources: Source[] = (grounding?.groundingChunks ?? [])
