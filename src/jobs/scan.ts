@@ -6,6 +6,7 @@ import { spendToday } from "@/db/spend.ts";
 import type { Exchange, ExchangeName } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { isGeminiUnavailable } from "@/llm/gemini.ts";
+import { isOpenAiUnavailable } from "@/llm/openai.ts";
 import { deepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
 import { settings } from "@/settings.ts";
@@ -19,7 +20,7 @@ import { runHousekeeping } from "./housekeeping.ts";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
-// No new deep dives start after this; with Gemini's timeout and retries, a scan always ends
+// No new deep dives start after this; with the models' timeouts and retries, a scan always ends
 // well inside the lock's lifetime, so a crashed scan blocks the next one for 30 minutes at most.
 const SCAN_DEADLINE = 15 * MINUTE;
 const SCAN_LOCK_TTL = 30 * MINUTE;
@@ -102,7 +103,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       // re-read prices: research can take minutes and the market may have moved
       const fresh = await exchange.getEvent(event.id);
       const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current);
-      const analysisId = await saveAnalysis(exchange.name, event, settings.model, research, {
+      const analysisId = await saveAnalysis(exchange.name, event, `${settings.reasoningModel} + ${settings.searchModel}`, research, {
         proposed: Boolean(proposal),
         nearMiss,
       });
@@ -149,7 +150,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       log.error("event research failed", { eventId: event.id, error: errorMessage(error) });
       failed.push({ title: event.title, error });
       // Unresearched events aren't recorded, so the next scan picks them up again
-      if (isGeminiUnavailable(error)) break;
+      if (isGeminiUnavailable(error) || isOpenAiUnavailable(error)) break;
     }
   }
 
