@@ -11,11 +11,10 @@ export type Usage = {
 export type StructuredRequest<T> = {
   system: string;
   prompt: string;
-  // JSON schema sent to Gemini so the reply has a fixed, compact shape
+  // JSON schema sent to the model so the reply has a fixed, compact shape
   jsonSchema: Record<string, unknown>;
   // validates the parsed reply on our side
   parse: z.ZodType<T>;
-  webSearch: boolean;
   maxOutputTokens: number;
 };
 
