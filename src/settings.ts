@@ -66,8 +66,9 @@ export const settings = {
 
   // --- Schedule when running locally ---
   // (on Cloud Run, Cloud Scheduler drives these; see .github/workflows/deploy-cloudrun.yml)
-  // 4 scans a day (00:00, 06:00, 12:00, 18:00 WAT); the daily budget still caps spend
-  scanEveryMinutes: 360,
+  // 6 scans a day (every 4h from 00:00 WAT): about 3,200 Google searches a month, safely inside
+  // the 5,000 free (8 a day would run close); the daily budget still caps spend
+  scanEveryMinutes: 240,
   tickEveryMinutes: 1,
   // late-price study: records settled markets (no Gemini); must stay under 11 hours (see src/jobs/study.ts)
   studyEveryMinutes: 360,
