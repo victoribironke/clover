@@ -21,7 +21,10 @@ test.each<[string, string, MarketKind]>([
   ["Will Nigeria’s Gross External Reserves Cross $56.5 Billion Before Q4 2026 Ends?", "ECONOMY", "economy"],
   ["Will Tinubu Post an Independence Day Message before 10AM October 1?", "SOCIAL MEDIA", "other"],
   ["ENG vs ESP: Who Will Win?", "SPORTS", "sports"],
-  ["How Many Passes Will England Get vs Spain?", "SPORTS", "sports"],
+  ["Argentina vs Bolivia: Total Goals", "SPORTS", "sports"],
+  ["How Many Passes Will England Get vs Spain?", "SPORTS", "match-stats"],
+  ["Turkey vs Italy: Total Shots?", "SPORTS", "match-stats"],
+  ["Chelsea vs Arsenal: Total Corners", "SPORTS", "match-stats"],
 ])("%s → %s", (title, category, expected) => {
   expect(kind(title, category)).toBe(expected);
 });
