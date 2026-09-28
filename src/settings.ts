@@ -51,9 +51,14 @@ export const settings = {
     "OTHERS",
     "SPORTS",
   ],
-  // Market kinds (src/data/kind.ts) never bet on. Likes/views/reposts/followers can be pushed
-  // by anyone who buys bots, and Bayse voids them more often for manipulation.
-  excludedKinds: ["engagement"],
+  // Market kinds (src/data/kind.ts) never researched or bet on. Likes/views/reposts/followers can
+  // be pushed by anyone who buys bots, and Bayse voids them more often for manipulation. Match
+  // stats (shots, passes, corners) have no bookmaker lines to check against, so bets on them
+  // were guesses (from 2026-09-28).
+  excludedKinds: ["engagement", "match-stats"],
+  // Kinds that are only bet on with a live reading. For sports that means current bookmaker odds
+  // for the line: without them the model is guessing from averages (from 2026-09-28).
+  liveReadingRequiredKinds: ["sports"],
   // only consider events that resolve within this many hours (7 days), so capital isn't tied up for long
   maxHoursToResolve: 168,
   // trading must stay open at least this long: the cancel window plus a margin to place the bet
