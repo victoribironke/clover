@@ -123,7 +123,7 @@ jobs:
             -d '{"url": "${{ steps.deploy.outputs.url }}/telegram", "secret_token": "${{ secrets.APP_SECRET }}"}'
 
       # Create the scheduler jobs on the first deploy, keep them pointed at the service afterwards.
-      # Scans every 6h (00:00, 06:00, 12:00, 18:00 WAT; matches settings.scanEveryMinutes) settle, research
+      # Scans every 4h (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT; matches settings.scanEveryMinutes) settle, research
       # and place bets themselves. The daily summary at 23:30 WAT settles again and reports the day.
       - name: Configure Cloud Scheduler
         run: |
@@ -138,7 +138,7 @@ jobs:
               gcloud scheduler jobs create http "$name" "${args[@]}" --headers="Authorization=Bearer ${{ secrets.APP_SECRET }}"
             fi
           }
-          upsert clover-scan "0 */6 * * *" /jobs/scan 1800s
+          upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
