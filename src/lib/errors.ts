@@ -1,10 +1,11 @@
 import { ApiError as GeminiApiError } from "@google/genai";
 import { GrammyError } from "grammy";
+import { APIError as OpenAiApiError } from "openai";
 import { z } from "zod";
 import { BayseApiError } from "@/exchanges/bayse/http.ts";
 
 export type ErrorInfo = {
-  // which service failed, e.g. "Gemini", "Bayse"
+  // which service failed, e.g. "Gemini", "OpenAI", "Bayse"
   source: string;
   // HTTP status and/or API status text, when known
   code: string | null;
@@ -43,6 +44,15 @@ export const describeError = (error: unknown): ErrorInfo => {
   if (error instanceof GeminiApiError) {
     const inner = unwrapJson(error.message);
     return { source: "Gemini", code: code(error.status, inner?.status), message: inner?.message ?? error.message };
+  }
+  if (error instanceof OpenAiApiError) {
+    // the SDK prefixes the status ("429 You exceeded…"); the parsed body has the plain text
+    const body = error.error as { message?: string; code?: string; type?: string } | undefined;
+    return {
+      source: "OpenAI",
+      code: code(error.status, body?.code ?? body?.type),
+      message: body?.message ?? error.message,
+    };
   }
   if (error instanceof BayseApiError) {
     const inner = unwrapJson(error.body);
