@@ -26,9 +26,12 @@ export const settings = {
   maxSlippage: 0.02,
 
   // --- Research ---
-  // one model for everything: screening and deep research (web search via Google)
-  model: "gemini-3.8-flash",
-  // hard cap on estimated Gemini spend per UTC day, in USD
+  // Gemini searches the web (Google Search, 5,000 free a month) and writes a fact brief;
+  // the OpenAI model screens markets and makes the betting call from that brief.
+  // Prices for both live in src/llm/pricing.ts.
+  searchModel: "gemini-3.8-flash",
+  reasoningModel: "gpt-6-luna",
+  // hard cap on estimated research spend (both models) per UTC day, in USD
   dailyResearchBudgetUsd: 0.6,
   maxDeepDivesPerScan: 10,
   // don't re-research an event within this window; prices and data move, so re-check a few times a day
