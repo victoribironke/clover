@@ -8,6 +8,7 @@ import { research } from "@/llm/gemini.ts";
 import { reason } from "@/llm/openai.ts";
 import type { Source, Usage } from "@/llm/types.ts";
 import { settings } from "@/settings.ts";
+import { parseBrief } from "./brief.ts";
 import { describeEvent, nowUtc } from "./describe-event.ts";
 
 export type Estimate = {
@@ -38,22 +39,13 @@ export type DeepDive = {
 
 // Step 1: the search model gathers facts
 const SEARCH_SYSTEM = `You research prediction markets for a forecaster, who can't search and only sees what you write. Find facts, don't forecast.
-First find the current state of the measured quantity inside the resolution window: the count or value so far, the latest chart figure, or the forecast for the resolution time. For sports, find current bookmaker odds for these exact lines (several bookmakers if you can), confirmed or expected lineups, injuries and suspensions, recent form and head-to-head, and what's at stake. Use the Data lines if given, open the Data pages, and search (at most 3 searches: pick the queries most likely to find current numbers or odds).
-"reading": the single most important current value, with its time and source, or "none" if you only found history. "live": true only if you found a current value, a forecast for the resolution window, or current bookmaker odds for these lines.
-"facts": everything useful, one per item, each with its number, date and source: current values and how fast they move, odds per line and bookmaker, forecasts, recent history, and anything in the rules or named source that changes the answer. Say when something couldn't be found. Numbers over adjectives, max 12 facts of max 30 words each.`;
-
-const searchSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["reading", "live", "facts"],
-  properties: {
-    reading: { type: "string" },
-    live: { type: "boolean" },
-    facts: { type: "array", items: { type: "string" } },
-  },
-};
-
-const searchParse = z.object({ reading: z.string(), live: z.boolean(), facts: z.array(z.string()) });
+First find the current state of the measured quantity inside the resolution window: the count or value so far, the latest chart figure, or the forecast for the resolution time. For sports, find current bookmaker odds for these exact lines (several bookmakers if you can), confirmed or expected lineups, injuries and suspensions, recent form and head-to-head, and what's at stake. Use the Data lines if given, open the Data pages, and always search (1 to 3 searches: pick the queries most likely to find current numbers or odds).
+Reply in exactly this plain-text format, nothing else:
+READING: the single most important current value, with its time and source, or "none" if you only found history
+LIVE: yes only if you found a current value, a forecast for the resolution window, or current bookmaker odds for these lines; otherwise no
+FACTS:
+- one fact per line, each with its number, date and source: current values and how fast they move, odds per line and bookmaker, forecasts, recent history, and anything in the rules or named source that changes the answer
+Say when something couldn't be found. Numbers over adjectives, max 12 facts of max 30 words each.`;
 
 // Step 2: the reasoning model decides
 const DECIDE_SYSTEM = `You are a calibrated forecaster for a Nigerian prediction market. These markets settle on measurable data or sports results. You get the event, its markets, and a fact brief from a researcher.
@@ -109,14 +101,13 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
   const found = await research({
     system: SEARCH_SYSTEM,
     prompt: [now, text, ...extra].join("\n"),
-    jsonSchema: searchSchema,
-    parse: searchParse,
     // includes thinking tokens; only what's used is billed
     maxOutputTokens: 6000,
   });
   const searchCost = await recordUsage(settings.searchModel, found.usage);
-  const liveData = data.hasLiveData || found.data.live;
-  const facts = found.data.facts.slice(0, 15);
+  const brief = parseBrief(found.text);
+  const liveData = data.hasLiveData || brief.live;
+  const facts = brief.facts.slice(0, 15);
 
   const decided = await reason({
     system: DECIDE_SYSTEM,
@@ -125,7 +116,7 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
       text,
       // the Data lines are hard numbers we fetched ourselves: pass them on as they are
       ...data.notes.map((note) => `Data: ${note}`),
-      `Researcher's reading: ${found.data.reading} (${liveData ? "live" : "not live"})`,
+      `Researcher's reading: ${brief.reading} (${liveData ? "live" : "not live"})`,
       "Facts:",
       ...facts.map((fact) => `- ${fact}`),
     ].join("\n"),
@@ -139,7 +130,7 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
 
   const usage = addUsage(found.usage, decided.usage);
   const costUsd = searchCost + decideCost;
-  log.info("deep dive", { eventId: event.id, usage, costUsd, liveData, reading: found.data.reading, facts: facts.length });
+  log.info("deep dive", { eventId: event.id, usage, costUsd, liveData, reading: brief.reading, facts: facts.length });
 
   // Without a live reading the estimate rests on history (e.g. "this artist has never done
   // 285k first-day streams") while the real number may already be close. Cap confidence at
@@ -155,11 +146,14 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
   return {
     summary: decided.data.summary,
     keyFactors: decided.data.factors.slice(0, 3),
-    reading: liveData
-      ? found.data.reading
-      : /^none\.?$/i.test(found.data.reading.trim())
-        ? "no live reading found"
-        : `no live reading; history only: ${found.data.reading}`,
+    reading: brief.live
+      ? brief.reading
+      : liveData
+        ? // our own fetched data was live even though the search found nothing newer
+          (data.notes[0] ?? brief.reading)
+        : /^none\.?$/i.test(brief.reading)
+          ? "no live reading found"
+          : `no live reading; history only: ${brief.reading}`,
     liveData,
     facts,
     sources: dedupeSources(found.sources).slice(0, 4),
