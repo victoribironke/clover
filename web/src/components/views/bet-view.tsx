@@ -107,6 +107,18 @@ const BetView = ({ id }: { id: string }) => {
                 ))}
               </ul>
             )}
+            {analysis.facts && analysis.facts.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-muted">
+                  Research brief ({analysis.facts.length} facts)
+                </summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {analysis.facts.map((fact) => (
+                    <li key={fact}>{fact}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {analysis.sources.length > 0 && (
               <div>
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Sources</p>
