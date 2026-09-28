@@ -3,7 +3,17 @@
 
 export type BetStatus = "pending" | "placing" | "placed" | "won" | "lost" | "void" | "cancelled" | "skipped" | "failed";
 
-export type MarketKind = "weather" | "post-count" | "engagement" | "streams" | "chart" | "price" | "economy" | "sports" | "other";
+export type MarketKind =
+  | "weather"
+  | "post-count"
+  | "engagement"
+  | "streams"
+  | "chart"
+  | "price"
+  | "economy"
+  | "sports"
+  | "match-stats"
+  | "other";
 
 export type Bet = {
   id: string;
