@@ -3,7 +3,7 @@ import { config } from "@/config.ts";
 import { recordUsage } from "@/db/spend.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
 import { log } from "@/lib/logger.ts";
-import { generate } from "@/llm/gemini.ts";
+import { reason } from "@/llm/openai.ts";
 import { settings } from "@/settings.ts";
 import { isTradeable, nowUtc } from "./describe-event.ts";
 
@@ -30,22 +30,21 @@ const line = (event: MarketEvent, index: number) => {
   return `e${index + 1}|${event.category}|${(event.resolutionDate ?? event.closingDate)?.slice(5, 16).replace("T", " ") ?? "-"}|${event.title.slice(0, 90)}|${prices}`;
 };
 
-// One cheap call (no web search) over the whole candidate list; returns event ids, best first
+// One cheap call to the reasoning model (no web search) over the whole candidate list; returns event ids, best first
 export const triageEvents = async (events: MarketEvent[], limit: number) => {
   // Always screen, even a short list: screening is what enforces "measurable data only",
   // and it costs a fraction of a cent
   if (events.length === 0 || limit === 0) return [];
 
-  const result = await generate({
+  const result = await reason({
     system: SYSTEM,
     prompt: `Now ${nowUtc()}. Pick up to ${limit}.\nref|category|resolves(UTC)|title|prices(%)\n${events.map(line).join("\n")}`,
     jsonSchema: schema,
     parse,
-    webSearch: false,
-    // includes thinking tokens; only what's used is billed
+    effort: "low",
     maxOutputTokens: 4000,
   });
-  const costUsd = await recordUsage(result.usage);
+  const costUsd = await recordUsage(settings.reasoningModel, result.usage);
 
   const picks = result.data.refs
     .map((ref) => events[Number(ref.replace(/^e/, "")) - 1]?.id)
