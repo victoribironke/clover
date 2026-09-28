@@ -5,7 +5,7 @@ A betting assistant for prediction markets. It scans [Bayse Markets](https://doc
 ## How it works
 
 ```
-every 6h   scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
+every 4h   scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -70,7 +70,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 4. registers the Telegram webhook
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
-   - scan every 6 hours (00:00, 06:00, 12:00, 18:00 WAT)
+   - scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
    - late-price study every 6 hours (no model calls, no money)
 
 Send `/status` to your bot to check it's alive.
