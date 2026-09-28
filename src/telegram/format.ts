@@ -90,7 +90,7 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 
 // ➖ Portugal vs Wales: Total Goals
 // Portugal have scored in 9 straight home games…
-// Closest: Over 2.5 goals → Yes · Gemini 58% (medium) vs market 49%
+// Closest: Over 2.5 goals → Yes · model 58% (medium) vs market 49%
 // counted as 53.5%, costs 52.1% → +2.7% · fees and price impact eat the edge
 const reviewedLines = ({ exchange, eventId, title, summary, reading, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
   const lines = [
@@ -103,7 +103,7 @@ const reviewedLines = ({ exchange, eventId, title, summary, reading, proposed, n
   } else if (nearMiss) {
     const pick = nearMiss.marketTitle === title ? nearMiss.outcomeLabel : `${nearMiss.marketTitle} → ${nearMiss.outcomeLabel}`;
     lines.push(
-      `Closest: ${escapeHtml(pick)} · Gemini ${pct(nearMiss.modelProbability)} (${nearMiss.confidence}) vs market ${pct(nearMiss.marketPrice)}`,
+      `Closest: ${escapeHtml(pick)} · model ${pct(nearMiss.modelProbability)} (${nearMiss.confidence}) vs market ${pct(nearMiss.marketPrice)}`,
       `counted as ${pct(nearMiss.probability)}, costs ${pct(nearMiss.price)} → ${pct(nearMiss.expectedReturn, true)} · ${escapeHtml(nearMiss.reason)}`,
     );
   } else {
