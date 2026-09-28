@@ -108,6 +108,7 @@ jobs:
             BAYSE_PUBLIC_KEY=${{ secrets.BAYSE_PUBLIC_KEY }}
             BAYSE_SECRET_KEY=${{ secrets.BAYSE_SECRET_KEY }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
             APP_SECRET=${{ secrets.APP_SECRET }}
