@@ -5,6 +5,7 @@ const envSchema = z.object({
   BAYSE_PUBLIC_KEY: z.string().min(1),
   BAYSE_SECRET_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1),
   TELEGRAM_BOT_TOKEN: z.string().min(1),
   TELEGRAM_CHAT_ID: z.coerce.number().int(),
   // shared secret for the Telegram webhook and the Cloud Scheduler job calls.
