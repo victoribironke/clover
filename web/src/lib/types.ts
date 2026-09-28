@@ -79,6 +79,8 @@ export type Analysis = {
   // added 2026-09-25; older analyses don't have them
   reading?: string;
   liveData?: boolean;
+  // added 2026-09-28: the search model's fact brief, read by the reasoning model
+  facts?: string[];
   sources: { title: string; url: string }[];
   estimates: { marketId: string; probabilityOutcome1: number; confidence: "low" | "medium" | "high" }[];
   usage?: { inputTokens: number; outputTokens: number; searches: number };
