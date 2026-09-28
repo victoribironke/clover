@@ -1,6 +1,6 @@
 # Clover
 
-Prediction-market betting bot. Scans Bayse (NGN), researches events with Gemini 3.8 Flash + Google Search (`src/llm`), stores state in Firestore, sizes bets with fractional Kelly, announces each bet on Telegram with a cancel window, then places it. Polymarket and Kalshi (USD) are planned: add them as new adapters implementing `Exchange` in `src/exchanges/types.ts`.
+Prediction-market betting bot. Scans Bayse (NGN), researches events in two steps (`src/llm`, `src/research/deep-dive.ts`): Gemini 3.8 Flash + Google Search writes a fact brief, then OpenAI gpt-6-luna screens markets and makes the betting call from it, stores state in Firestore, sizes bets with fractional Kelly, announces each bet on Telegram with a cancel window, then places it. Polymarket and Kalshi (USD) are planned: add them as new adapters implementing `Exchange` in `src/exchanges/types.ts`.
 
 ## Conventions
 
@@ -16,7 +16,8 @@ Prediction-market betting bot. Scans Bayse (NGN), researches events with Gemini 
 - Size bets from live quotes. Use `Quote.avgPrice`, which is amount / (shares × payout), because CLOB fees are taken out of the shares you receive.
 - Never auto-retry order placement (`auth: "write"` requests are not retried). Bets left in `placing` by a crash are resolved in `src/jobs/recover.ts`: paper bets are re-queued; for live bets, look the order up on Bayse and never re-send it.
 - The bot only works with `settings.capitalNgn`. Profit above it is left for withdrawal.
-- Research spend is capped by `settings.dailyResearchBudgetUsd`. If the model changes, update `src/llm/pricing.ts`.
+- Research spend is capped by `settings.dailyResearchBudgetUsd`. Both models are priced in `src/llm/pricing.ts` (`MODEL_PRICES`); a model without a price throws. If `settings.searchModel` or `settings.reasoningModel` changes, update it.
+- Web search stays on Gemini (5,000 free Google searches a month; OpenAI bills every search). The reasoning model gets no web tools: it only sees the event, our Data lines and Gemini's brief, so anything it needs must be in the brief.
 - Keep LLM prompts and JSON schemas terse. Use short refs (`e1`, `m1`), not UUIDs. Take sources from search metadata, not from model output.
 - Research reasons from the current number, not history. `src/data/` fetches hard data before the model runs (Open-Meteo ensemble for weather, public chart mirrors for streams). The model must report a live `reading`; without one, confidence is capped at "low" ("medium" for recurring post counts) in `src/research/deep-dive.ts`.
 - Engagement markets (likes/views/reposts/followers) are never bet on (`settings.excludedKinds`): they're manipulable and void often.
