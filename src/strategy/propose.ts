@@ -1,3 +1,4 @@
+import { marketKind } from "@/data/kind.ts";
 import type { Confidence } from "@/db/bets.ts";
 import type { Exchange, Market, MarketEvent, Outcome } from "@/exchanges/types.ts";
 import { describeError } from "@/lib/errors.ts";
@@ -79,9 +80,12 @@ export const proposeBet = async (
   event: MarketEvent,
   estimates: Estimate[],
   bankroll: Bankroll,
+  // whether the research found a live reading (see DeepDive.liveData)
+  liveData: boolean,
 ): Promise<Verdict> => {
   const candidates: Proposal[] = [];
   const misses: NearMiss[] = [];
+  const blocked = !liveData && (settings.liveReadingRequiredKinds as readonly string[]).includes(marketKind(event));
 
   for (const estimate of estimates) {
     const market = event.markets.find((item) => item.id === estimate.marketId);
@@ -109,6 +113,10 @@ export const proposeBet = async (
       const listedEdge = expectedReturn(probability, outcome.price);
       if (listedEdge < settings.minEdge) {
         miss(outcome.price, listedEdge, `edge too small (needs ${needs})`);
+        continue;
+      }
+      if (blocked) {
+        miss(outcome.price, listedEdge, "no bet without a live reading (for sports: bookmaker odds for this line)");
         continue;
       }
 
