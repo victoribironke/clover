@@ -17,15 +17,17 @@ const ai = new GoogleGenAI({
 export const isGeminiUnavailable = (error: unknown) =>
   error instanceof ApiError && [429, 500, 502, 503, 504].includes(error.status);
 
-export const generate = async <T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> => {
+// The search model: Google Search grounding plus URL reading. It gathers facts; the reasoning
+// model (./openai.ts) makes the call.
+export const research = async <T>(request: StructuredRequest<T>): Promise<StructuredResult<T>> => {
   const response = await ai.models.generateContent({
-    model: settings.model,
+    model: settings.searchModel,
     contents: request.prompt,
     config: {
       systemInstruction: request.system,
       // Gemini 3 allows search grounding, URL reading and a JSON schema in the same call.
       // URL context lets the model open data pages named in the prompt; their text is billed as input.
-      tools: request.webSearch ? [{ googleSearch: {} }, { urlContext: {} }] : undefined,
+      tools: [{ googleSearch: {} }, { urlContext: {} }],
       responseMimeType: "application/json",
       responseJsonSchema: request.jsonSchema,
       maxOutputTokens: request.maxOutputTokens,
