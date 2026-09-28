@@ -102,7 +102,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
 
       // re-read prices: research can take minutes and the market may have moved
       const fresh = await exchange.getEvent(event.id);
-      const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current);
+      const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current, research.liveData);
       const analysisId = await saveAnalysis(exchange.name, event, `${settings.reasoningModel} + ${settings.searchModel}`, research, {
         proposed: Boolean(proposal),
         nearMiss,
