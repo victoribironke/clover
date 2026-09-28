@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { ApiError as GeminiApiError } from "@google/genai";
+import { APIError as OpenAiApiError } from "openai";
 import { BayseApiError } from "@/exchanges/bayse/http.ts";
 import { describeError } from "./errors.ts";
 
@@ -13,6 +14,16 @@ test("unwraps a Gemini API error", () => {
     source: "Gemini",
     code: "400 INVALID_ARGUMENT",
     message: "Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.",
+  });
+});
+
+test("unwraps an OpenAI API error", () => {
+  const body = { message: "You exceeded your current quota.", type: "insufficient_quota", code: "insufficient_quota" };
+  const error = OpenAiApiError.generate(429, { error: body }, undefined, new Headers());
+  expect(describeError(error)).toEqual({
+    source: "OpenAI",
+    code: "429 insufficient_quota",
+    message: "You exceeded your current quota.",
   });
 });
 
