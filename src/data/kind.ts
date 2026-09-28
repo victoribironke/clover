@@ -7,9 +7,34 @@ import { parseWeatherQuestion } from "./weather.ts";
 // compared by type: e.g. "are weather bets really more profitable than post counts?"
 // "engagement" (likes, views, reposts, followers) is its own kind because anyone who buys bots
 // can move the number, and Bayse voids these more often for manipulation.
-export type MarketKind = "weather" | "post-count" | "engagement" | "streams" | "chart" | "price" | "economy" | "sports" | "other";
+// "match-stats" (shots, passes, corners, cards…) is split from "sports" because bookmakers rarely
+// price those lines, so there's no market to check the model's guess against.
+export type MarketKind =
+  | "weather"
+  | "post-count"
+  | "engagement"
+  | "streams"
+  | "chart"
+  | "price"
+  | "economy"
+  | "sports"
+  | "match-stats"
+  | "other";
 
-export const MARKET_KINDS: MarketKind[] = ["weather", "post-count", "engagement", "streams", "chart", "price", "economy", "sports", "other"];
+export const MARKET_KINDS: MarketKind[] = [
+  "weather",
+  "post-count",
+  "engagement",
+  "streams",
+  "chart",
+  "price",
+  "economy",
+  "sports",
+  "match-stats",
+  "other",
+];
+
+const MATCH_STATS = /\b(shots?|passes|corners?|cards?|bookings?|possession|fouls?|offsides?|tackles?|saves?|throw-?ins?)\b/i;
 
 const ENGAGEMENT = /\b(likes?|views?|reposts?|retweets?|followers?|subscribers?|impressions?|comments?|reactions?)\b/i;
 
@@ -18,8 +43,9 @@ type Classifiable = Pick<MarketEvent, "title" | "category" | "resolutionDate" | 
 export const marketKind = (event: Classifiable): MarketKind => {
   const title = event.title;
   const category = event.category.toUpperCase();
-  // match results and match stats ("Total Shots", "How Many Passes") are sports, whatever their wording
-  if (category === "SPORTS" || category === "PLAYER STATS") return "sports";
+  // results and goals are "sports"; shots, passes, corners and player stats are "match-stats"
+  if (category === "PLAYER STATS") return "match-stats";
+  if (category === "SPORTS") return MATCH_STATS.test(title) ? "match-stats" : "sports";
   if (parseWeatherQuestion(event as MarketEvent) || /\b(temperature|rainfall|weather)\b/i.test(title)) return "weather";
   // before post counts: "likes on her latest post" mentions posts but measures engagement
   if (ENGAGEMENT.test(title)) return "engagement";
