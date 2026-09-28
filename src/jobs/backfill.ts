@@ -5,7 +5,8 @@ import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 
 // v2 (2026-09-26): also relabels sports bets classified "other" before the sports kind existed
-const FLAG = "backfill-bet-kind-v2";
+// v3 (2026-09-28): also splits shots/passes/corners bets out of "sports" into "match-stats"
+const FLAG = "backfill-bet-kind-v3";
 const SPORTS = new Set(["SPORTS", "PLAYER STATS"]);
 
 // One-off: bets placed before 2026-09-25 have no category/kind. Look their events up once and
@@ -15,7 +16,10 @@ export const backfillBetKinds = async (exchange: Exchange) => {
   if (await hasFlag(FLAG)) return 0;
 
   const missing = (await listBets(ALL_STATUSES, 10_000)).filter(
-    (bet) => !bet.kind || (SPORTS.has((bet.category ?? "").toUpperCase()) && bet.kind !== "sports"),
+    (bet) =>
+      !bet.kind ||
+      (SPORTS.has((bet.category ?? "").toUpperCase()) &&
+        bet.kind !== marketKind({ title: bet.eventTitle, category: bet.category ?? "", resolutionDate: null, closingDate: null })),
   );
   let filled = 0;
   for (const [eventId, bets] of Map.groupBy(missing, (bet) => bet.eventId)) {
