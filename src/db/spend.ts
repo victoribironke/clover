@@ -11,9 +11,9 @@ const dayRef = (day: string) => collection("kv").doc(`spend-${day}`);
 const searchesRef = () => collection("kv").doc(`searches-${thisMonth()}`);
 
 // Price a call, record it, and return its estimated USD cost
-export const recordUsage = async (usage: Usage) => {
+export const recordUsage = async (model: string, usage: Usage) => {
   const searchesThisMonth = ((await searchesRef().get()).get("count") as number | undefined) ?? 0;
-  const costUsd = estimateCost(usage, searchesThisMonth);
+  const costUsd = estimateCost(model, usage, searchesThisMonth);
   await Promise.all([
     dayRef(today()).set({ usd: FieldValue.increment(costUsd), day: today() }, { merge: true }),
     usage.searches > 0 ? searchesRef().set({ count: FieldValue.increment(usage.searches) }, { merge: true }) : null,
