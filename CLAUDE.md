@@ -1,6 +1,6 @@
 # Clover
 
-Prediction-market betting bot. Scans Bayse (NGN), researches events in two steps (`src/llm`, `src/research/deep-dive.ts`): Gemini 3.8 Flash + Google Search writes a fact brief, then OpenAI gpt-6-luna screens markets and makes the betting call from it, stores state in Firestore, sizes bets with fractional Kelly, announces each bet on Telegram with a cancel window, then places it. Polymarket and Kalshi (USD) are planned: add them as new adapters implementing `Exchange` in `src/exchanges/types.ts`.
+Prediction-market betting bot. Scans Bayse (NGN), researches events in two steps (`src/llm`, `src/research/deep-dive.ts`): Gemini 3.8 Flash + Google Search writes a fact brief, then OpenAI gpt-6-luna screens markets and makes the betting call from it, stores state in Firestore, sizes bets with fractional Kelly, announces each bet on Telegram with a cancel window, then places it. Kalshi (USD) runs alongside, paper only (`src/exchanges/kalshi/`): daily US temperature markets, priced without AI (`src/research/weather-model.ts`). Polymarket is next: add it as an adapter implementing `Exchange` in `src/exchanges/types.ts`.
 
 ## Conventions
 
@@ -15,7 +15,11 @@ Prediction-market betting bot. Scans Bayse (NGN), researches events in two steps
 - `settings.dryRun = true` is the default: no real orders are sent.
 - Size bets from live quotes. Use `Quote.avgPrice`, which is amount / (shares × payout), because CLOB fees are taken out of the shares you receive.
 - Never auto-retry order placement (`auth: "write"` requests are not retried). Bets left in `placing` by a crash are resolved in `src/jobs/recover.ts`: paper bets are re-queued; for live bets, look the order up on Bayse and never re-send it.
-- The bot only works with `settings.capitalNgn`. Profit above it is left for withdrawal.
+- Each exchange has its own capital and paper/live switch (`settings.exchanges`), in its own currency. The bot only works with that capital; profit above it is left for withdrawal. Bets carry `exchange` and `currency`: filter by exchange before summing money, and format with `money(amount, currency)`.
+- An exchange with `canTrade: false` (Kalshi: public market data, no account) is always paper (`isDryRun` in `src/exchanges/mode.ts`); its account calls throw.
+- Jobs run per exchange: scans (`/jobs/scan?exchange=`, one lock each), settle, recover and execute only touch that exchange's bets. The late-price study and the wallet snapshot are Bayse only.
+- Kalshi weather: settles on an NWS station, midnight to midnight local STANDARD time, whole °F. Forecast-stage model/market gaps were model error (2°F+, checked 2026-09-30), so bets need the station's readings after 4 PM LST (`liveData` in `weather-model.ts`, enforced by `liveReadingRequiredKinds`). Don't loosen that without paper results that back it.
+- Kalshi's public API rate-limits fast: list series one at a time, and retry reads on 429 (reads only).
 - Research spend is capped by `settings.dailyResearchBudgetUsd`. Both models are priced in `src/llm/pricing.ts` (`MODEL_PRICES`); a model without a price throws. If `settings.searchModel` or `settings.reasoningModel` changes, update it.
 - Web search stays on Gemini (5,000 free Google searches a month; OpenAI bills every search). The reasoning model gets no web tools: it only sees the event, our Data lines and Gemini's brief, so anything it needs must be in the brief.
 - Keep LLM prompts and JSON schemas terse. Use short refs (`e1`, `m1`), not UUIDs. Take sources from search metadata, not from model output.
