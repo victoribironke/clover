@@ -1,6 +1,6 @@
 import { config } from "@/config.ts";
 import { publishSettings, releaseHeldLocks } from "@/db/kv.ts";
-import { exchange } from "@/exchanges/index.ts";
+import { bayse, exchanges, kalshi } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
@@ -27,7 +27,7 @@ const shutdown = async (signal: string) => {
   log.warn("shutting down", { signal });
   try {
     const released = await releaseHeldLocks();
-    if (released.includes("scan")) {
+    if (released.some((name) => name.startsWith("scan"))) {
       await notify(
         "⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.",
         { level: "alert" },
@@ -43,14 +43,17 @@ const main = async () => {
   process.once("SIGINT", () => void shutdown("SIGINT"));
   registerHandlers();
   // best effort: the web panel falls back to defaults if this fails
-  await publishSettings({ ...settings }).catch((error) =>
-    log.warn("publish settings failed", { error: errorMessage(error) }),
-  );
+  await publishSettings({
+    ...settings,
+    // the fields older panel code reads: Bayse's mode and capital
+    dryRun: settings.exchanges.bayse.dryRun,
+    capitalNgn: settings.exchanges.bayse.capital,
+  }).catch((error) => log.warn("publish settings failed", { error: errorMessage(error) }));
   const server = startServer();
   log.info("server listening", {
     port: server.port,
     cloudRun: config.onCloudRun,
-    dryRun: settings.dryRun,
+    exchanges: exchanges.map((exchange) => exchange.name),
   });
 
   await bot.api.setMyCommands([
@@ -69,9 +72,16 @@ const main = async () => {
   if (!config.onCloudRun) {
     await bot.api.deleteWebhook();
     void bot.start({ onStart: (me) => log.info("telegram polling", { bot: me.username }) });
-    every(settings.tickEveryMinutes, "tick", () => runTick(exchange))();
-    every(settings.scanEveryMinutes, "scan", () => runScanAndReport(exchange))();
-    every(settings.studyEveryMinutes, "study", () => runStudy(exchange))();
+    for (const exchange of exchanges) {
+      every(settings.tickEveryMinutes, `tick ${exchange.name}`, () => runTick(exchange))();
+    }
+    if (exchanges.includes(bayse)) {
+      every(settings.scanEveryMinutes, "scan bayse", () => runScanAndReport(bayse))();
+    }
+    if (exchanges.includes(kalshi)) {
+      every(settings.kalshiScanEveryMinutes, "scan kalshi", () => runScanAndReport(kalshi))();
+    }
+    every(settings.studyEveryMinutes, "study", () => runStudy(bayse))();
   }
 };
 
