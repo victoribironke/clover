@@ -40,6 +40,13 @@ export type Verdict = { proposal: Proposal | null; nearMiss: NearMiss | null };
 const MIN_PRICE = 0.03;
 const MAX_PRICE = 0.97;
 const QUOTE_ATTEMPTS = 4;
+// what counts as a live reading, per kind, for the near-miss note
+const LIVE_READING: Partial<Record<string, string>> = {
+  sports: "bookmaker odds for this line",
+  "post-count": "the count so far",
+  weather: "the station’s readings after the day’s peak",
+};
+
 const needs = `+${Math.round(settings.minEdge * 100)}%`;
 
 type Priced =
@@ -97,9 +104,9 @@ export const proposeBet = async (
 ): Promise<Verdict> => {
   const candidates: Proposal[] = [];
   const misses: NearMiss[] = [];
+  const kind = marketKind(event);
   const blocked =
-    !liveData &&
-    (settings.liveReadingRequiredKinds as readonly string[]).includes(marketKind(event));
+    !liveData && (settings.liveReadingRequiredKinds as readonly string[]).includes(kind);
 
   for (const estimate of estimates) {
     const market = event.markets.find((item) => item.id === estimate.marketId);
@@ -138,7 +145,7 @@ export const proposeBet = async (
         miss(
           outcome.price,
           listedEdge,
-          "no bet without a live reading (for sports: bookmaker odds for this line)",
+          `no bet without a live reading (${LIVE_READING[kind] ?? "current data"})`,
         );
         continue;
       }
