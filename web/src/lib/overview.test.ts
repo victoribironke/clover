@@ -33,7 +33,7 @@ const bet = (overrides: Partial<Bet>): Bet => ({
   ...overrides,
 });
 
-const settings = { dryRun: true, capitalNgn: 10_000, dailyResearchBudgetUsd: 0.25 };
+const capital = 10_000;
 const now = new Date("2026-09-25T12:00:00Z");
 
 describe("buildOverview", () => {
@@ -48,7 +48,7 @@ describe("buildOverview", () => {
   ];
   const overview = buildOverview(
     bets,
-    settings,
+    capital,
     [
       { day: "2026-09-24", usd: 0.05 },
       { day: "2026-08-30", usd: 0.1 },
@@ -86,7 +86,7 @@ describe("buildOverview", () => {
   });
 
   test("profit above capital is withdrawable", () => {
-    const winning = buildOverview([bet({ status: "won", pnl: 4293 })], settings, [], "paper", now);
+    const winning = buildOverview([bet({ status: "won", pnl: 4293 })], capital, [], "paper", now);
     expect(winning).toMatchObject({ workingBankroll: 10_000, withdrawable: 4293 });
   });
 });
