@@ -1,9 +1,11 @@
-import { config } from "@/config.ts";
 import { betTotals } from "@/db/bets.ts";
-import type { Exchange } from "@/exchanges/types.ts";
+import { isDryRun } from "@/exchanges/mode.ts";
+import type { Currency, Exchange, ExchangeName } from "@/exchanges/types.ts";
 import { settings } from "@/settings.ts";
 
 export type Bankroll = {
+  exchange: ExchangeName;
+  currency: Currency;
   capital: number;
   // cash the bot could spend right now
   available: number;
@@ -19,12 +21,12 @@ export type Bankroll = {
   dryRun: boolean;
 };
 
-// Capital rule: the bot only ever works with CAPITAL_NGN. Anything above it is
-// profit that is left alone for withdrawal; after losses it works with what's left.
-// In dry-run mode the wallet is simulated as capital + paper P&L.
+// Capital rule: on each exchange the bot only ever works with that exchange's capital
+// (settings.exchanges). Anything above it is profit that is left alone for withdrawal; after
+// losses it works with what's left. In dry-run mode the wallet is simulated as capital + paper P&L.
 export const getBankroll = async (exchange: Exchange): Promise<Bankroll> => {
-  const capital = settings.capitalNgn;
-  const dryRun = settings.dryRun;
+  const capital = settings.exchanges[exchange.name].capital;
+  const dryRun = isDryRun(exchange);
   const { exposure, realizedPnl, unsent } = await betTotals(exchange.name, dryRun);
 
   // In live mode the wallet balance already has placed stakes deducted, but not
@@ -38,6 +40,8 @@ export const getBankroll = async (exchange: Exchange): Promise<Bankroll> => {
   const withdrawable = Math.max(0, walletAvailable + exposure - capital);
 
   return {
+    exchange: exchange.name,
+    currency: exchange.currency,
     capital,
     available: Math.max(0, walletAvailable),
     exposure,
