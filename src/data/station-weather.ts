@@ -53,27 +53,68 @@ const round = (value: number) => Math.round(value);
 
 // One final value per ensemble run: the observed extreme so far, pushed further by whatever
 // the run forecasts for the hours still to come. Whole degrees, like the climate report.
+// Where the true extreme so far can lie, in °F: most readings are whole °C (see Reading), so a
+// "low so far" of 20°C is anything from 67.1 to 68.9°F, and the official report can say 67, 68 or 69
+export type Observed = { min: number; max: number };
+
+const HOUR = 3_600_000;
+// A 6-hour group whose window starts a little before the climate day still counts: the overnight
+// low that matters is near sunrise, hours after midnight
+const GROUP_LEAD_MS = 2 * HOUR;
+
+// The high (or low) so far as a range. A precise reading pins its end of the range; a whole-°C one
+// only says the true value was within ±0.9°F of it. The 6-hourly reports' max/min groups record the
+// true extreme of their 6 hours, so whole-°C readings inside a window they cover are dropped.
+export const observedExtreme = (
+  kind: "high" | "low",
+  all: Reading[],
+  dayStart = Number.NEGATIVE_INFINITY,
+): Observed | null => {
+  const groups = all.flatMap((reading) => {
+    const value = kind === "high" ? reading.max6 : reading.min6;
+    if (value === undefined) return [];
+    // reports at :51-:53 close the 6 hours up to the next whole hour
+    const end = Math.round(reading.at / HOUR) * HOUR;
+    const start = end - 6 * HOUR;
+    return start >= dayStart - GROUP_LEAD_MS ? [{ start, end, value }] : [];
+  });
+  const covered = (at: number) => groups.some((group) => at >= group.start && at <= group.end);
+  const readings = [
+    ...all.filter((reading) => reading.precise || !covered(reading.at)),
+    ...groups.map((group) => ({ at: group.end, f: group.value, precise: true })),
+  ];
+  if (readings.length === 0) return null;
+  const pick = kind === "high" ? Math.max : Math.min;
+  const low = (reading: Reading) => (reading.precise ? reading.f : reading.f - WHOLE_C_SLACK);
+  const top = (reading: Reading) => (reading.precise ? reading.f : reading.f + WHOLE_C_SLACK);
+  // a high is at least the largest lower bound and at most the largest upper bound; a low mirrors it
+  return { min: pick(...readings.map(low)), max: pick(...readings.map(top)) };
+};
+
+// One final value per ensemble run: the observed extreme so far, pushed further by whatever the
+// run forecasts for the hours still to come. Whole degrees, like the climate report. The runs are
+// spread evenly across the observed range, so its uncertainty carries into the band odds.
 export const finalValues = ({
   kind,
   observed,
   runs,
 }: {
   kind: "high" | "low";
-  // extreme of the readings so far, or null before the day starts / without readings
-  observed: number | null;
+  // range of the extreme so far, or null before the day starts / without readings
+  observed: Observed | null;
   // per run, its forecast values for the rest of the day
   runs: number[][];
 }) => {
   const pick = kind === "high" ? Math.max : Math.min;
-  const values = runs
-    .map((future) => {
-      const all = observed === null ? future : [observed, ...future];
+  // day over (or no forecast hours left): the readings decide, spread over their range
+  const series = runs.length > 0 ? runs : observed ? Array.from({ length: 21 }, () => []) : [];
+  return series
+    .map((future, index) => {
+      const at = observed ? observed.min + ((index + 0.5) / series.length) * (observed.max - observed.min) : null;
+      const all = at === null ? future : [at, ...future];
       return all.length ? round(pick(...all)) : null;
     })
     .filter((value): value is number => value !== null);
-  // day over (or no forecast hours left): the readings decide
-  if (values.length === 0 && observed !== null) return [round(observed)];
-  return values;
 };
 
 // Our readings aren't the official report: checked against 192 settled Kalshi days (2026-09-30),
@@ -177,10 +218,32 @@ export const stationInfo = async (icao: string) => {
   return station;
 };
 
-export type Reading = { at: number; f: number };
+// `precise`: an hourly report (METAR), in tenths of °C. The 5-minute readings in between are whole
+// °C (checked 2026-09-30 at KLAX: 20, 20, 21, then 21.1 in the METAR), so they're only good to ±0.9°F.
+// `max6`/`min6`: the true high/low of the 6 hours before a 00/06/12/18Z report (its "1snTTT" and
+// "2snTTT" remarks, in tenths of °C), which catch peaks between readings. Kalshi's traders read these:
+// on 2026-09-30 LA's "20194" (a 66.9°F low) was why the market sat at 95% on 66-67°F while the
+// whole-°C readings said 68.
+export type Reading = { at: number; f: number; precise: boolean; max6?: number; min6?: number };
+
+const toF = (c: number) => Math.round(((c * 9) / 5) * 10 + 320) / 10;
+
+// "RMK AO2 SLP072 T02000183 10222 20194 53004" -> max 22.2°C, min 19.4°C
+export const sixHourGroups = (raw: string) => {
+  const remarks = raw.slice(raw.indexOf(" RMK ") + 1);
+  const group = (prefix: "1" | "2") => {
+    const match = remarks.match(new RegExp(`(?:^|\\s)${prefix}([01])(\\d{3})(?=\\s|$)`));
+    return match ? toF(((match[1] === "1" ? -1 : 1) * Number(match[2])) / 10) : undefined;
+  };
+  return raw.includes(" RMK ") ? { max6: group("1"), min6: group("2") } : {};
+};
+
+const WHOLE_C_SLACK = 0.9;
 
 type ObservationsPage = {
-  features?: { properties: { timestamp: string; temperature?: { value: number | null } } }[];
+  features?: {
+    properties: { timestamp: string; temperature?: { value: number | null }; rawMessage?: string };
+  }[];
   pagination?: { next?: string };
 };
 
@@ -200,10 +263,19 @@ export const stationReadings = async (
       .map((feature) => ({
         at: Date.parse(feature.properties.timestamp),
         c: feature.properties.temperature?.value,
+        // METARs come with their raw text; the 5-minute readings don't
+        raw: feature.properties.rawMessage ?? "",
       }))
-      .filter((reading): reading is { at: number; c: number } => typeof reading.c === "number");
+      .filter(
+        (reading): reading is { at: number; c: number; raw: string } => typeof reading.c === "number",
+      );
     readings.push(
-      ...batch.map(({ at, c }) => ({ at, f: Math.round(((c * 9) / 5) * 10 + 320) / 10 })),
+      ...batch.map(({ at, c, raw }) => ({
+        at,
+        f: toF(c),
+        precise: raw.length > 0,
+        ...sixHourGroups(raw),
+      })),
     );
     if (batch.length === 0 || batch.some((reading) => reading.at < start)) break;
     url = data.pagination?.next;
