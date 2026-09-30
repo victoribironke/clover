@@ -82,12 +82,19 @@ describe("finalValues", () => {
 
 describe("sixHourGroups", () => {
   test("reads the 6-hour max and min from a METAR's remarks", () => {
-    const raw = "KLAX 301153Z 00000KT 10SM OVC011 20/18 A2982 RMK AO2 SLP072 T02000183 10222 20194 53004 $";
+    const raw =
+      "KLAX 301153Z 00000KT 10SM OVC011 20/18 A2982 RMK AO2 SLP072 T02000183 10222 20194 53004 $";
     expect(sixHourGroups(raw)).toEqual({ max6: 72, min6: 66.9 });
   });
   test("handles below-zero values and reports without the groups", () => {
-    expect(sixHourGroups("KDEN 011153Z RMK AO2 T10061022 11006 21022")).toEqual({ max6: 30.9, min6: 28 });
-    expect(sixHourGroups("KLAX 301512Z RMK AO2 T02110183 $")).toEqual({ max6: undefined, min6: undefined });
+    expect(sixHourGroups("KDEN 011153Z RMK AO2 T10061022 11006 21022")).toEqual({
+      max6: 30.9,
+      min6: 28,
+    });
+    expect(sixHourGroups("KLAX 301512Z RMK AO2 T02110183 $")).toEqual({
+      max6: undefined,
+      min6: undefined,
+    });
     expect(sixHourGroups("")).toEqual({});
   });
 });
@@ -95,7 +102,9 @@ describe("sixHourGroups", () => {
 describe("observedExtreme", () => {
   const reading = (f: number, precise: boolean) => ({ at: 0, f, precise });
   test("precise readings pin the extreme", () => {
-    expect(observedExtreme("high", [reading(70.2, true), reading(69.8, true)])).toEqual(exact(70.2));
+    expect(observedExtreme("high", [reading(70.2, true), reading(69.8, true)])).toEqual(
+      exact(70.2),
+    );
   });
   test("a whole-°C reading leaves ±0.9°F", () => {
     // LA on 2026-09-30: 5-minute readings at 20°C (68°F), METARs a little higher
