@@ -6,7 +6,7 @@ import Chips from "@/components/chips";
 import PageHeader from "@/components/page-header";
 import { usePanel } from "@/components/panel-provider";
 import { filterBets, kindOf, STATUS_GROUPS, type StatusGroup } from "@/lib/analytics";
-import { lagosDateTime, money, pct, signedMoney } from "@/lib/format";
+import { lagosDateTime, pct } from "@/lib/format";
 import { MARKET_KIND_LABELS, STATUS_STYLE } from "@/lib/labels";
 
 const STATUS_LABELS: Record<StatusGroup, string> = {
@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<StatusGroup, string> = {
 };
 
 const BetsView = () => {
-  const { bets, mode } = usePanel();
+  const { bets, mode, money, signedMoney } = usePanel();
   const [status, setStatus] = useState<StatusGroup>("all");
   const [kind, setKind] = useState("all");
 
