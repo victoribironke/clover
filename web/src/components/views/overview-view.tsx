@@ -6,17 +6,18 @@ import BankrollChart from "@/components/bankroll-chart";
 import PageHeader from "@/components/page-header";
 import { usePanel } from "@/components/panel-provider";
 import StatCard from "@/components/stat-card";
-import { lagosDateTime, money, pct, signedMoney, usd } from "@/lib/format";
+import { lagosDateTime, pct, usd } from "@/lib/format";
 import { STATUS_STYLE } from "@/lib/labels";
 import { buildOverview } from "@/lib/overview";
 
 const tone = (value: number) => (value > 0 ? "gain" : value < 0 ? "loss" : "neutral");
 
 const OverviewView = () => {
-  const { bets, botSettings, spend, wallet, mode, fetchedAt } = usePanel();
+  const { bets, spend, wallet, mode, fetchedAt, venue, capital, botDryRun, money, signedMoney } =
+    usePanel();
   const overview = useMemo(
-    () => buildOverview(bets, botSettings, spend, mode, new Date(fetchedAt)),
-    [bets, botSettings, spend, mode, fetchedAt],
+    () => buildOverview(bets, capital, spend, mode, new Date(fetchedAt)),
+    [bets, capital, spend, mode, fetchedAt],
   );
 
   const recent = useMemo(
@@ -31,20 +32,23 @@ const OverviewView = () => {
     [bets, mode],
   );
 
-  // the real Bayse wallet; capital is only the ceiling the bot works within
-  const walletHint = !wallet
-    ? "not recorded yet"
-    : botSettings.dryRun
-      ? "real money, untouched while paper trading"
-      : wallet.available + overview.inPlay < overview.capital
-        ? `⚠️ below the ${money(overview.capital)} capital`
-        : `${money(Math.max(0, wallet.available + overview.inPlay - overview.capital))} outside the bot's capital`;
+  // the real Bayse wallet; capital is only the ceiling the bot works within. Kalshi has no account yet.
+  const walletHint =
+    venue === "kalshi"
+      ? "no account connected (paper only)"
+      : !wallet
+        ? "not recorded yet"
+        : botDryRun
+          ? "real money, untouched while paper trading"
+          : wallet.available + overview.inPlay < overview.capital
+            ? `⚠️ below the ${money(overview.capital)} capital`
+            : `${money(Math.max(0, wallet.available + overview.inPlay - overview.capital))} outside the bot's capital`;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Overview"
-        subtitle={`The bot is ${botSettings.dryRun ? "📝 paper trading" : "💸 live"}. Showing the ${mode} record.`}
+        subtitle={`The bot is ${botDryRun ? "📝 paper trading" : "💸 live"} on ${venue === "kalshi" ? "Kalshi" : "Bayse"}. Showing the ${mode} record.`}
         withMode
       />
 
@@ -84,11 +88,11 @@ const OverviewView = () => {
         <StatCard
           label="Research this month"
           value={usd(overview.researchSpendMonthUsd)}
-          hint={`${usd(overview.researchSpendUsd)} all time`}
+          hint={`${usd(overview.researchSpendUsd)} all time · both exchanges`}
         />
         <StatCard
-          label="Bayse wallet"
-          value={wallet ? money(wallet.available) : "–"}
+          label={venue === "kalshi" ? "Kalshi wallet" : "Bayse wallet"}
+          value={venue === "bayse" && wallet ? money(wallet.available) : "–"}
           hint={walletHint}
           tone={walletHint.startsWith("⚠️") ? "loss" : "neutral"}
         />
@@ -96,7 +100,7 @@ const OverviewView = () => {
 
       <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="mb-2 text-sm font-medium">Bankroll</h2>
-        <BankrollChart points={overview.curve} capital={overview.capital} />
+        <BankrollChart points={overview.curve} capital={overview.capital} format={money} />
       </section>
 
       <section className="rounded-xl border border-border bg-card">
