@@ -8,10 +8,18 @@ const LAGOS_OFFSET_MS = 3_600_000;
 
 const group = (whole: number) => String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-export const money = (amount: number) =>
-  `${amount < 0 ? "-" : ""}₦${group(Math.round(Math.abs(amount)))}`;
+// ₦10,890 (whole naira) or $12.34 (cents)
+export const money = (amount: number, currency: "NGN" | "USD" = "NGN") => {
+  const sign = amount < 0 ? "-" : "";
+  if (currency === "USD") {
+    const cents = Math.round(Math.abs(amount) * 100);
+    return `${sign}$${group(Math.floor(cents / 100))}.${String(cents % 100).padStart(2, "0")}`;
+  }
+  return `${sign}₦${group(Math.round(Math.abs(amount)))}`;
+};
 
-export const signedMoney = (amount: number) => `${amount > 0 ? "+" : ""}${money(amount)}`;
+export const signedMoney = (amount: number, currency: "NGN" | "USD" = "NGN") =>
+  `${amount > 0 ? "+" : ""}${money(amount, currency)}`;
 
 export const pct = (value: number | null, digits = 1) =>
   value === null ? "–" : `${(value * 100).toFixed(digits)}%`;
@@ -39,5 +47,8 @@ export const lagosTime = (iso: string) => {
   return `${two(date.getUTCHours())}:${two(date.getUTCMinutes())}`;
 };
 
-export const bayseEventUrl = (eventId: string) =>
-  `https://app.bayse.markets/market/${encodeURIComponent(eventId)}`;
+// the event's page on its exchange (same patterns as the bot's src/exchanges/links.ts)
+export const eventUrl = (exchange: "bayse" | "kalshi", eventId: string) =>
+  exchange === "kalshi"
+    ? `https://kalshi.com/markets/${encodeURIComponent(eventId.split("-")[0]!.toLowerCase())}`
+    : `https://app.bayse.markets/market/${encodeURIComponent(eventId)}`;
