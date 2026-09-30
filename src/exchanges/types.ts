@@ -1,8 +1,9 @@
-// Exchange-agnostic shapes. Bayse is the first adapter; Polymarket and Kalshi
-// should map onto the same types so the research/sizing/execution pipeline
-// never needs to know which venue it is talking to.
+// Exchange-agnostic shapes. Bayse and Kalshi map onto the same types (Polymarket next), so the
+// research/sizing/execution pipeline never needs to know which venue it is talking to.
 
-export type ExchangeName = "bayse";
+export type ExchangeName = "bayse" | "kalshi";
+
+export const EXCHANGE_LABELS: Record<ExchangeName, string> = { bayse: "Bayse", kalshi: "Kalshi" };
 export type Currency = "NGN" | "USD";
 export type EventStatus = "open" | "paused" | "closed" | "resolved" | "cancelled" | "draft";
 
@@ -23,6 +24,9 @@ export type Market = {
   minOrderAmount: number;
   feePercentage: number;
   resolvedOutcomeId: string | null;
+  // for numeric bands (e.g. Kalshi "75° to 76°"): outcome1 wins when the value lands in
+  // [min, max], both inclusive; null = open-ended on that side
+  range?: { min: number | null; max: number | null };
 };
 
 export type MarketEvent = {
@@ -93,6 +97,9 @@ export type PriceHistory = Record<string, { t: number; p: number }[]>;
 
 export type Exchange = {
   name: ExchangeName;
+  // false = market data only (no account connected): every bet is paper, and the account
+  // calls (placeOrder, findOrders, balances) throw
+  canTrade: boolean;
   currency: Currency;
   // what one winning share pays out, in `currency` (₦100 on Bayse NGN, $1 on USD venues)
   payoutPerShare: number;
