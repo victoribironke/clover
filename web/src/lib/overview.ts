@@ -39,7 +39,9 @@ export const buildOverview = (
   now = new Date(),
 ): Overview => {
   const mine = bets.filter((bet) => bet.dryRun === (mode === "paper"));
-  const settled = mine.filter((bet) => SETTLED.has(bet.status)).sort((a, b) => settledAt(a).localeCompare(settledAt(b)));
+  const settled = mine
+    .filter((bet) => SETTLED.has(bet.status))
+    .sort((a, b) => settledAt(a).localeCompare(settledAt(b)));
   const open = mine.filter((bet) => LIVE.has(bet.status));
   const won = settled.filter((bet) => bet.status === "won");
   const lost = settled.filter((bet) => bet.status === "lost");
@@ -50,7 +52,9 @@ export const buildOverview = (
   const capital = settings.capitalNgn;
 
   let running = 0;
-  const curve: CurvePoint[] = [{ at: settled[0]?.createdAt ?? now.toISOString(), bankroll: capital, pnl: 0 }];
+  const curve: CurvePoint[] = [
+    { at: settled[0]?.createdAt ?? now.toISOString(), bankroll: capital, pnl: 0 },
+  ];
   for (const bet of settled) {
     running += bet.pnl ?? 0;
     curve.push({ at: settledAt(bet), bankroll: capital + running, pnl: running });
@@ -73,7 +77,9 @@ export const buildOverview = (
     staked,
     roi: staked > 0 ? realizedPnl / staked : null,
     researchSpendUsd: spend.reduce((total, day) => total + day.usd, 0),
-    researchSpendMonthUsd: spend.filter((day) => day.day.startsWith(month)).reduce((total, day) => total + day.usd, 0),
+    researchSpendMonthUsd: spend
+      .filter((day) => day.day.startsWith(month))
+      .reduce((total, day) => total + day.usd, 0),
     curve,
   };
 };

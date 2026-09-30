@@ -28,11 +28,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`;
 const CalibrationChart = ({ points, xLabel }: CalibrationChartProps) => {
   const shown = points.filter((point) => point.n > 0);
   if (shown.length === 0)
-    return (
-      <p className="py-16 text-center text-sm text-muted">
-        Not enough settled bets yet.
-      </p>
-    );
+    return <p className="py-16 text-center text-sm text-muted">Not enough settled bets yet.</p>;
   return (
     <ResponsiveContainer width="100%" height={300}>
       <ScatterChart margin={{ top: 12, right: 16, bottom: 24, left: 8 }}>
@@ -71,9 +67,7 @@ const CalibrationChart = ({ points, xLabel }: CalibrationChartProps) => {
           strokeDasharray="4 4"
         />
         <Tooltip
-          formatter={(value, name) =>
-            name === "n" ? String(value) : percent(Number(value))
-          }
+          formatter={(value, name) => (name === "n" ? String(value) : percent(Number(value)))}
           labelFormatter={() => ""}
           contentStyle={{
             background: "var(--card)",

@@ -48,7 +48,10 @@ export const registerHandlers = () => {
   });
 
   bot.command("summary", async (ctx) => {
-    await ctx.reply(await buildDailySummary(exchange), { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+    await ctx.reply(await buildDailySummary(exchange), {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    });
   });
 
   bot.command("study", async (ctx) => {
@@ -82,7 +85,9 @@ export const registerHandlers = () => {
       void fetch(`${origin}/jobs/scan?manual=1`, {
         method: "POST",
         headers: { authorization: `Bearer ${config.APP_SECRET}` },
-      }).catch((error) => notify(failureMessage("Couldn't start the scan", error), { level: "always" }));
+      }).catch((error) =>
+        notify(failureMessage("Couldn't start the scan", error), { level: "always" }),
+      );
     } else {
       void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
     }
@@ -94,7 +99,9 @@ export const registerHandlers = () => {
     await ctx.answerCallbackQuery(cancelled ? "Cancelled" : "Too late, it's no longer pending");
     if (cancelled) {
       await ctx.editMessageReplyMarkup({ reply_markup: undefined });
-      await ctx.reply("🚫 Bet cancelled.", { reply_parameters: { message_id: ctx.callbackQuery.message!.message_id } });
+      await ctx.reply("🚫 Bet cancelled.", {
+        reply_parameters: { message_id: ctx.callbackQuery.message!.message_id },
+      });
     }
   });
 

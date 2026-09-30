@@ -55,7 +55,13 @@ describe("stakeFor", () => {
   });
 
   // The Solana case from a real scan: 43.8% vs 38.5% sizes to ₦215, under the ₦500 minimum
-  const solana = { ...base, probability: 0.438, price: 0.385, minOrderAmount: 500, minimumStakeFraction: 0.05 };
+  const solana = {
+    ...base,
+    probability: 0.438,
+    price: 0.385,
+    minOrderAmount: 500,
+    minimumStakeFraction: 0.05,
+  };
 
   test("rounds a small edge up to the market minimum when it's at most 5% of bankroll", () => {
     expect(stakeFor(solana)).toBe(500);

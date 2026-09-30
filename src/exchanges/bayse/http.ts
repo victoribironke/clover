@@ -42,7 +42,15 @@ export const createBayseHttp = (options: BayseHttpOptions) => {
   const request = async <T>(
     method: "GET" | "POST" | "DELETE",
     path: string,
-    { auth = "public", query, body }: { auth?: BayseAuth; query?: Record<string, string | number | undefined>; body?: unknown } = {},
+    {
+      auth = "public",
+      query,
+      body,
+    }: {
+      auth?: BayseAuth;
+      query?: Record<string, string | number | undefined>;
+      body?: unknown;
+    } = {},
   ): Promise<T> => {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(query ?? {})) {

@@ -8,4 +8,5 @@ export const firestore = new Firestore({ ignoreUndefinedProperties: true });
 
 // The bot writes production data to unprefixed collections (dev_* is its local test data).
 // The panel shows production, locally too.
-export const collection = (name: "bets" | "analyses" | "kv" | "studies") => firestore.collection(name);
+export const collection = (name: "bets" | "analyses" | "kv" | "studies") =>
+  firestore.collection(name);

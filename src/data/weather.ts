@@ -42,7 +42,13 @@ export const parseWeatherQuestion = (event: MarketEvent): WeatherQuestion | null
   };
 };
 
-type GeoResult = { name: string; latitude: number; longitude: number; country?: string; population?: number };
+type GeoResult = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  country?: string;
+  population?: number;
+};
 
 const geocodeCache = new Map<string, GeoResult | null>();
 
@@ -50,13 +56,18 @@ const geocode = async (city: string, country: string | null) => {
   const key = `${city}|${country ?? ""}`;
   if (geocodeCache.has(key)) return geocodeCache.get(key)!;
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=10&language=en`;
-  const { results = [] } = (await fetch(url, { signal: AbortSignal.timeout(15_000) }).then((r) => r.json())) as {
+  const { results = [] } = (await fetch(url, { signal: AbortSignal.timeout(15_000) }).then((r) =>
+    r.json(),
+  )) as {
     results?: GeoResult[];
   };
   const inCountry = country
     ? results.filter((result) => result.country?.toLowerCase() === country.toLowerCase())
     : results;
-  const best = [...(inCountry.length ? inCountry : results)].sort((a, b) => (b.population ?? 0) - (a.population ?? 0))[0] ?? null;
+  const best =
+    [...(inCountry.length ? inCountry : results)].sort(
+      (a, b) => (b.population ?? 0) - (a.population ?? 0),
+    )[0] ?? null;
   geocodeCache.set(key, best);
   return best;
 };
@@ -64,7 +75,8 @@ const geocode = async (city: string, country: string | null) => {
 const utcDay = (date: Date) => date.toISOString().slice(0, 10);
 const utcHour = (date: Date) => `${date.toISOString().slice(0, 13)}:00`;
 
-const quantile = (sorted: number[], q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
+const quantile = (sorted: number[], q: number) =>
+  sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
 
 export type WeatherData = {
   // one line for the research brief
@@ -73,7 +85,10 @@ export type WeatherData = {
   probabilityYes: number | null;
 };
 
-export const fetchWeatherData = async (question: WeatherQuestion, now = Date.now()): Promise<WeatherData | null> => {
+export const fetchWeatherData = async (
+  question: WeatherQuestion,
+  now = Date.now(),
+): Promise<WeatherData | null> => {
   const place = await geocode(question.city, question.country);
   if (!place) return null;
 
@@ -81,12 +96,15 @@ export const fetchWeatherData = async (question: WeatherQuestion, now = Date.now
   const day = utcDay(question.at);
   const hour = utcHour(question.at);
   const label = `${question.city} at ${question.at.toISOString().slice(0, 16).replace("T", " ")} UTC`;
-  const yes = (value: number) => (question.direction === "above" ? value > question.thresholdC : value < question.thresholdC);
+  const yes = (value: number) =>
+    question.direction === "above" ? value > question.thresholdC : value < question.thresholdC;
 
   // The reading time has already passed: report what the models recorded for that hour
   if (question.at.getTime() <= now) {
     const url = `https://api.open-meteo.com/v1/forecast?${coords}&hourly=temperature_2m&timezone=GMT&start_date=${day}&end_date=${day}`;
-    const data = (await fetch(url, { signal: AbortSignal.timeout(15_000) }).then((r) => r.json())) as {
+    const data = (await fetch(url, { signal: AbortSignal.timeout(15_000) }).then((r) =>
+      r.json(),
+    )) as {
       hourly?: { time: string[]; temperature_2m: (number | null)[] };
     };
     const value = data.hourly?.temperature_2m[data.hourly.time.indexOf(hour)];
@@ -98,7 +116,9 @@ export const fetchWeatherData = async (question: WeatherQuestion, now = Date.now
   }
 
   const url = `https://ensemble-api.open-meteo.com/v1/ensemble?${coords}&hourly=temperature_2m&models=icon_seamless,gfs_seamless,ecmwf_ifs025&timezone=GMT&start_date=${day}&end_date=${day}`;
-  const data = (await fetch(url, { signal: AbortSignal.timeout(20_000) }).then((r) => r.json())) as {
+  const data = (await fetch(url, { signal: AbortSignal.timeout(20_000) }).then((r) =>
+    r.json(),
+  )) as {
     hourly?: Record<string, (number | null)[]> & { time: string[] };
   };
   if (!data.hourly) return null;

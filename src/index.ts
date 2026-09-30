@@ -28,7 +28,10 @@ const shutdown = async (signal: string) => {
   try {
     const released = await releaseHeldLocks();
     if (released.includes("scan")) {
-      await notify("⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.", { level: "alert" });
+      await notify(
+        "⚠️ <b>Scan interrupted</b>\nThe server restarted (usually a new deploy). Send /scan to run it again.",
+        { level: "alert" },
+      );
     }
   } finally {
     process.exit(0);
@@ -40,9 +43,15 @@ const main = async () => {
   process.once("SIGINT", () => void shutdown("SIGINT"));
   registerHandlers();
   // best effort: the web panel falls back to defaults if this fails
-  await publishSettings({ ...settings }).catch((error) => log.warn("publish settings failed", { error: errorMessage(error) }));
+  await publishSettings({ ...settings }).catch((error) =>
+    log.warn("publish settings failed", { error: errorMessage(error) }),
+  );
   const server = startServer();
-  log.info("server listening", { port: server.port, cloudRun: config.onCloudRun, dryRun: settings.dryRun });
+  log.info("server listening", {
+    port: server.port,
+    cloudRun: config.onCloudRun,
+    dryRun: settings.dryRun,
+  });
 
   await bot.api.setMyCommands([
     { command: "status", description: "Bankroll and profit" },

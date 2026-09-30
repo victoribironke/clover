@@ -5,7 +5,8 @@ const MIN_PRICE = 0.03;
 const MAX_PRICE = 0.97;
 
 export const isTradeable = (market: Market) =>
-  market.status === "open" && market.outcomes.some((outcome) => outcome.price >= MIN_PRICE && outcome.price <= MAX_PRICE);
+  market.status === "open" &&
+  market.outcomes.some((outcome) => outcome.price >= MIN_PRICE && outcome.price <= MAX_PRICE);
 
 const clip = (text: string, max: number) => {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -31,7 +32,8 @@ export const describeEvent = (event: MarketEvent): DescribedEvent => {
   const omitted = event.markets.length - markets.length;
 
   // rules repeat across the markets of one event, so print each distinct text once
-  const sharedRules = new Set(markets.map((market) => market.rules)).size === 1 ? markets[0]?.rules : undefined;
+  const sharedRules =
+    new Set(markets.map((market) => market.rules)).size === 1 ? markets[0]?.rules : undefined;
 
   const lines = [
     `Event: ${event.title}`,
@@ -39,7 +41,9 @@ export const describeEvent = (event: MarketEvent): DescribedEvent => {
     event.resolutionDate && `Resolves: ${utc(event.resolutionDate)}`,
     event.resolutionSource && `Source: ${clip(event.resolutionSource, 150)}`,
     // descriptions often repeat the rules verbatim
-    event.description && clip(event.description, 500) !== clip(sharedRules ?? "", 500) && `Info: ${clip(event.description, 400)}`,
+    event.description &&
+      clip(event.description, 500) !== clip(sharedRules ?? "", 500) &&
+      `Info: ${clip(event.description, 400)}`,
     event.type === "combined" &&
       `Mutually exclusive: one market resolves YES.${omitted ? ` ${omitted} long-shot options not listed.` : ""}`,
     sharedRules && `Rules: ${clip(sharedRules, 500)}`,
@@ -50,5 +54,8 @@ export const describeEvent = (event: MarketEvent): DescribedEvent => {
     }),
   ];
 
-  return { text: lines.filter((line): line is string => typeof line === "string").join("\n"), marketIdByRef };
+  return {
+    text: lines.filter((line): line is string => typeof line === "string").join("\n"),
+    marketIdByRef,
+  };
 };

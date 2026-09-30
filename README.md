@@ -36,7 +36,7 @@ every 4h   scan ─► settle ─► filter ─► screen (1 luna call) ─► d
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `BAYSE_PUBLIC_KEY`, `BAYSE_SECRET_KEY` | app.bayse.markets → Settings → API Keys                                                                                                                                                                                                                |
 | `GEMINI_API_KEY`                       | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → _Create API key_ → pick the `fl-clover` project. Turn on billing for the key (_Set up billing_ in AI Studio) so you get paid-tier limits and your prompts aren't used for training. |
-| `OPENAI_API_KEY`                       | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → _Create new secret key_. Add credit under _Billing_; the reasoning model costs about $2 a month here. |
+| `OPENAI_API_KEY`                       | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → _Create new secret key_. Add credit under _Billing_; the reasoning model costs about $2 a month here.                                                                           |
 | `TELEGRAM_BOT_TOKEN`                   | Message [@BotFather](https://t.me/BotFather) → `/newbot` → choose a name and a username ending in `bot`. It replies with the token. Then open your new bot and press _Start_, so it's allowed to message you.                                          |
 | `TELEGRAM_CHAT_ID`                     | Message [@userinfobot](https://t.me/userinfobot). It replies with your numeric `Id`.                                                                                                                                                                   |
 | `APP_SECRET`                           | Any random string of letters and digits, 32 or more characters. For example, run `openssl rand -hex 32` (works in Git Bash). It protects the Telegram webhook and the scheduled job endpoints.                                                         |
@@ -85,8 +85,8 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
   curl -X POST -d '' -H "Authorization: Bearer $APP_SECRET" https://clover-uhkg4fo2na-od.a.run.app/jobs/tick
   ```
   Use `/jobs/scan` in place of `/jobs/tick` to run a scan. Sending `/scan` in Telegram does the same thing.
-- **Logs:** Cloud Run → `clover` → *Logs*. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
-- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-tick` and `clover-scan`. *Force run* triggers one immediately.
+- **Logs:** Cloud Run → `clover` → _Logs_. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
+- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-tick` and `clover-scan`. _Force run_ triggers one immediately.
 
 ## Running locally
 
@@ -105,14 +105,14 @@ Running locally with the production bot token switches Telegram from the webhook
 
 ### Telegram commands
 
-| Command              | What it does                                                              |
-| -------------------- | ------------------------------------------------------------------------- |
+| Command              | What it does                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
 | `/status`            | Capital, money in play, realized P&L, withdrawable profit, your real Bayse wallet balance, research spend |
-| `/summary`           | The last 24 hours: bets placed, results, open bets, research spend, problems |
-| `/bets`              | Pending and open bets                                                     |
-| `/scan`              | Run a scan now                                                            |
-| `/study`             | Late-price study: are prices fair near the end, void rates by market type |
-| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                    |
+| `/summary`           | The last 24 hours: bets placed, results, open bets, research spend, problems                              |
+| `/bets`              | Pending and open bets                                                                                     |
+| `/scan`              | Run a scan now                                                                                            |
+| `/study`             | Late-price study: are prices fair near the end, void rates by market type                                 |
+| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                                    |
 
 ## Web panel
 

@@ -24,20 +24,31 @@ export const anchorFor = (event: MarketEvent) => {
   const close = event.closingDate ?? event.resolutionDate;
   const closeAt = close ? Date.parse(close) : null;
   const measured = measurementTime(event)?.getTime() ?? null;
-  const anchorAt = measured !== null && (closeAt === null || measured <= closeAt) ? measured : closeAt;
+  const anchorAt =
+    measured !== null && (closeAt === null || measured <= closeAt) ? measured : closeAt;
   return { anchorAt, closeAt, anchorIsMeasurement: anchorAt !== null && anchorAt === measured };
 };
 
-export const buildStudy = (event: MarketEvent, status: Study["status"], history: PriceHistory, now = Date.now()): Study => {
+export const buildStudy = (
+  event: MarketEvent,
+  status: Study["status"],
+  history: PriceHistory,
+  now = Date.now(),
+): Study => {
   const { anchorAt, closeAt, anchorIsMeasurement } = anchorFor(event);
 
   const markets: StudyMarket[] = event.markets.map((market) => {
     const series = history[market.id] ?? [];
-    const at = (minutesBefore: number) => (anchorAt === null ? null : priceAt(series, anchorAt - minutesBefore * MINUTE));
+    const at = (minutesBefore: number) =>
+      anchorAt === null ? null : priceAt(series, anchorAt - minutesBefore * MINUTE);
     // only meaningful when trading continued after the measurement
     const afterTime = anchorAt === null ? null : anchorAt + 15 * MINUTE;
     const after15 =
-      anchorIsMeasurement && afterTime !== null && closeAt !== null && afterTime < closeAt && afterTime <= now
+      anchorIsMeasurement &&
+      afterTime !== null &&
+      closeAt !== null &&
+      afterTime < closeAt &&
+      afterTime <= now
         ? priceAt(series, afterTime)
         : null;
     const path: [number, number][] = [];
@@ -48,8 +59,19 @@ export const buildStudy = (event: MarketEvent, status: Study["status"], history:
       }
     }
     const won =
-      status === "resolved" && market.resolvedOutcomeId ? market.resolvedOutcomeId === market.outcomes[0].id : null;
-    return { marketId: market.id, title: market.title, won, at60: at(60), at30: at(30), at10: at(10), after15, path };
+      status === "resolved" && market.resolvedOutcomeId
+        ? market.resolvedOutcomeId === market.outcomes[0].id
+        : null;
+    return {
+      marketId: market.id,
+      title: market.title,
+      won,
+      at60: at(60),
+      at30: at(30),
+      at10: at(10),
+      after15,
+      path,
+    };
   });
 
   return {

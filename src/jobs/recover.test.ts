@@ -88,13 +88,22 @@ describe("recoverStuckBets", () => {
 
   test("marks a live bet placed when its order is on Bayse", async () => {
     bets = [bet({})];
-    await recoverStuckBets(exchangeWith([{ id: "ord1", status: "filled", amount: 520, avgPrice: 0.52, shares: 10 }]));
-    expect(bets[0]).toMatchObject({ status: "placed", orderId: "ord1", fillPrice: 0.52, shares: 10 });
+    await recoverStuckBets(
+      exchangeWith([{ id: "ord1", status: "filled", amount: 520, avgPrice: 0.52, shares: 10 }]),
+    );
+    expect(bets[0]).toMatchObject({
+      status: "placed",
+      orderId: "ord1",
+      fillPrice: 0.52,
+      shares: 10,
+    });
   });
 
   test("derives shares when Bayse doesn't report them", async () => {
     bets = [bet({})];
-    await recoverStuckBets(exchangeWith([{ id: "ord1", status: "open", amount: 520, avgPrice: 0.52, shares: 0 }]));
+    await recoverStuckBets(
+      exchangeWith([{ id: "ord1", status: "open", amount: 520, avgPrice: 0.52, shares: 0 }]),
+    );
     // ₦520 at 52% of a ₦100 payout = 10 shares
     expect(bets[0]!.shares).toBeCloseTo(10);
   });

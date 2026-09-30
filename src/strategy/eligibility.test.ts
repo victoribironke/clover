@@ -42,7 +42,8 @@ const event = (overrides: Partial<MarketEvent>): MarketEvent => ({
   ...overrides,
 });
 
-const passes = (overrides: Partial<MarketEvent>) => eligibleEvents([event(overrides)], new Set(), NOW).length === 1;
+const passes = (overrides: Partial<MarketEvent>) =>
+  eligibleEvents([event(overrides)], new Set(), NOW).length === 1;
 
 describe("eligibleEvents", () => {
   test("keeps an event that resolves tonight", () => {
@@ -81,13 +82,37 @@ describe("eligibleEvents", () => {
 
 describe("excluded kinds", () => {
   test("drops engagement markets even in allowed categories", () => {
-    expect(passes({ category: "SOCIAL MEDIA", title: "How Many Likes Will Taylor Swift's Latest Post Get?", resolutionDate: inHours(5) })).toBe(false);
+    expect(
+      passes({
+        category: "SOCIAL MEDIA",
+        title: "How Many Likes Will Taylor Swift's Latest Post Get?",
+        resolutionDate: inHours(5),
+      }),
+    ).toBe(false);
   });
   test("drops price markets (crypto, stocks)", () => {
-    expect(passes({ category: "CRYPTO", title: "Bitcoin Price above $83,375.57 by 4:00 PM GMT on Sep 29?", resolutionDate: inHours(5) })).toBe(false);
-    expect(passes({ category: "FINANCE", title: "Best Performing NGX Banking Stock This Week?", resolutionDate: inHours(5) })).toBe(false);
+    expect(
+      passes({
+        category: "CRYPTO",
+        title: "Bitcoin Price above $83,375.57 by 4:00 PM GMT on Sep 29?",
+        resolutionDate: inHours(5),
+      }),
+    ).toBe(false);
+    expect(
+      passes({
+        category: "FINANCE",
+        title: "Best Performing NGX Banking Stock This Week?",
+        resolutionDate: inHours(5),
+      }),
+    ).toBe(false);
   });
   test("keeps post counts in the same category", () => {
-    expect(passes({ category: "SOCIAL MEDIA", title: "Pop Base’s Number of X Posts Today, September 25, 2026?", resolutionDate: inHours(5) })).toBe(true);
+    expect(
+      passes({
+        category: "SOCIAL MEDIA",
+        title: "Pop Base’s Number of X Posts Today, September 25, 2026?",
+        resolutionDate: inHours(5),
+      }),
+    ).toBe(true);
   });
 });

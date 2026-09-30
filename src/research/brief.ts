@@ -6,7 +6,8 @@
 // Read leniently: a missing or malformed line only loses that line, never the whole deep dive.
 export type Brief = { reading: string; live: boolean; facts: string[] };
 
-const field = (text: string, name: string) => text.match(new RegExp(`^[*_\\s]*${name}[*_]*\\s*:[*_]*\\s*(.*)$`, "im"))?.[1]?.trim();
+const field = (text: string, name: string) =>
+  text.match(new RegExp(`^[*_\\s]*${name}[*_]*\\s*:[*_]*\\s*(.*)$`, "im"))?.[1]?.trim();
 
 const isNone = (reading: string) => /^(none|n\/a|not found|no\b.*found)\.?$/i.test(reading);
 

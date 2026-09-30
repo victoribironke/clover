@@ -37,7 +37,10 @@ export const research = async (request: ResearchRequest): Promise<ResearchResult
   });
 
   const text = response.text;
-  if (!text) throw new Error(`Gemini returned no text (finish: ${response.candidates?.[0]?.finishReason ?? "unknown"})`);
+  if (!text)
+    throw new Error(
+      `Gemini returned no text (finish: ${response.candidates?.[0]?.finishReason ?? "unknown"})`,
+    );
 
   const grounding = response.candidates?.[0]?.groundingMetadata;
   const sources: Source[] = (grounding?.groundingChunks ?? [])

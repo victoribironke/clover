@@ -14,7 +14,8 @@ export type EventData = {
 };
 
 // Sites that block logged-out reading or only work as apps: listing them wastes a fetch
-const UNREADABLE = /(^|\.)(x\.com|twitter\.com|apps\.apple\.com|music\.apple\.com|instagram\.com|tiktok\.com|charts\.spotify\.com)$/i;
+const UNREADABLE =
+  /(^|\.)(x\.com|twitter\.com|apps\.apple\.com|music\.apple\.com|instagram\.com|tiktok\.com|charts\.spotify\.com)$/i;
 
 const readable = (url: string) => {
   try {
@@ -28,16 +29,22 @@ const readable = (url: string) => {
 // Public mirrors of charts whose official sites need a login
 const chartPages = (event: MarketEvent) => {
   const text = `${event.title} ${event.description} ${event.resolutionSource}`.toLowerCase();
-  const nigeria = /nigeria|\bng\b|naija/.test(text) || text.includes("spotify.com") || text.includes("apple music");
+  const nigeria =
+    /nigeria|\bng\b|naija/.test(text) ||
+    text.includes("spotify.com") ||
+    text.includes("apple music");
   const pages: string[] = [];
-  if (nigeria && text.includes("spotify")) pages.push("https://kworb.net/spotify/country/ng_daily.html");
-  if (nigeria && text.includes("apple music")) pages.push("https://kworb.net/charts/apple_s/ng.html");
+  if (nigeria && text.includes("spotify"))
+    pages.push("https://kworb.net/spotify/country/ng_daily.html");
+  if (nigeria && text.includes("apple music"))
+    pages.push("https://kworb.net/charts/apple_s/ng.html");
   return pages;
 };
 
 // Recurring counts of a habit (an account's posts per day/week). Unlike a one-off release,
 // the history of the same count is real evidence here, even without a live reading.
-export const isRecurringCount = (event: MarketEvent) => /number of (x )?posts|\bposts\b.*\b(today|by \d|this week)/i.test(event.title);
+export const isRecurringCount = (event: MarketEvent) =>
+  /number of (x )?posts|\bposts\b.*\b(today|by \d|this week)/i.test(event.title);
 
 export const gatherEventData = async (event: MarketEvent): Promise<EventData> => {
   const notes: string[] = [];
@@ -56,6 +63,11 @@ export const gatherEventData = async (event: MarketEvent): Promise<EventData> =>
     }
   }
 
-  const pages = [...new Set([...(readable(event.resolutionSource) ? [event.resolutionSource] : []), ...chartPages(event)])];
+  const pages = [
+    ...new Set([
+      ...(readable(event.resolutionSource) ? [event.resolutionSource] : []),
+      ...chartPages(event),
+    ]),
+  ];
   return { notes, pages, hasLiveData };
 };

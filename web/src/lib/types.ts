@@ -1,7 +1,8 @@
 // Read-only views of the documents the bot writes to Firestore. The bot owns these shapes:
 // Bet mirrors src/db/bets.ts, BotSettings mirrors src/settings.ts. Keep them in step when those change.
 
-export type BetStatus = "pending" | "placing" | "placed" | "won" | "lost" | "void" | "cancelled" | "skipped" | "failed";
+export type BetStatus =
+  "pending" | "placing" | "placed" | "won" | "lost" | "void" | "cancelled" | "skipped" | "failed";
 
 export type MarketKind =
   | "weather"
@@ -92,7 +93,11 @@ export type Analysis = {
   // added 2026-09-28: the search model's fact brief, read by the reasoning model
   facts?: string[];
   sources: { title: string; url: string }[];
-  estimates: { marketId: string; probabilityOutcome1: number; confidence: "low" | "medium" | "high" }[];
+  estimates: {
+    marketId: string;
+    probabilityOutcome1: number;
+    confidence: "low" | "medium" | "high";
+  }[];
   usage?: { inputTokens: number; outputTokens: number; searches: number };
   costUsd?: number;
   proposed?: boolean;
@@ -106,7 +111,13 @@ export type StudySummary = {
   events: number;
   since: string | null;
   at10: StudyBucket[];
-  byKind: { kind: MarketKind; events: number; voids: number; markets: number; lateGap: number | null }[];
+  byKind: {
+    kind: MarketKind;
+    events: number;
+    voids: number;
+    markets: number;
+    lateGap: number | null;
+  }[];
   lateOpen: { n: number; avgPrice: number; winRate: number };
   publishedAt?: string;
 };

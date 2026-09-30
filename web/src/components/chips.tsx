@@ -15,7 +15,9 @@ const Chips = <T extends string>({ options, current, onChange }: ChipsProps<T>) 
         type="button"
         onClick={() => onChange(option.value)}
         className={`rounded-full border px-3 py-1 text-xs ${
-          option.value === current ? "border-foreground bg-foreground text-background" : "border-border text-muted hover:text-foreground"
+          option.value === current
+            ? "border-foreground bg-foreground text-background"
+            : "border-border text-muted hover:text-foreground"
         }`}
       >
         {option.label}

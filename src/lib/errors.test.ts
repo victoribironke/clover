@@ -13,12 +13,17 @@ test("unwraps a Gemini API error", () => {
   expect(describeError(error)).toEqual({
     source: "Gemini",
     code: "400 INVALID_ARGUMENT",
-    message: "Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.",
+    message:
+      "Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.",
   });
 });
 
 test("unwraps an OpenAI API error", () => {
-  const body = { message: "You exceeded your current quota.", type: "insufficient_quota", code: "insufficient_quota" };
+  const body = {
+    message: "You exceeded your current quota.",
+    type: "insufficient_quota",
+    code: "insufficient_quota",
+  };
   const error = OpenAiApiError.generate(429, { error: body }, undefined, new Headers());
   expect(describeError(error)).toEqual({
     source: "OpenAI",

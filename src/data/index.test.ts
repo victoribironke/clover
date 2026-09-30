@@ -15,7 +15,13 @@ describe("isRecurringCount", () => {
     }
   });
   test("doesn't match one-off releases or weather", () => {
-    expect(isRecurringCount(event("How Many First-Day Streams For New Ayo Maff ft Zinoleesky?"))).toBe(false);
-    expect(isRecurringCount(event("Will the Temperature in Lagos, Nigeria be  above 28°C by 5:00 PM WAT on Sept 26?"))).toBe(false);
+    expect(
+      isRecurringCount(event("How Many First-Day Streams For New Ayo Maff ft Zinoleesky?")),
+    ).toBe(false);
+    expect(
+      isRecurringCount(
+        event("Will the Temperature in Lagos, Nigeria be  above 28°C by 5:00 PM WAT on Sept 26?"),
+      ),
+    ).toBe(false);
   });
 });

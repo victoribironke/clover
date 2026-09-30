@@ -8,7 +8,8 @@ import { resultsByKind } from "@/lib/analytics";
 import { money, pct, signedMoney } from "@/lib/format";
 import { MARKET_KIND_LABELS } from "@/lib/labels";
 
-const tone = (value: number | null) => (value === null || value === 0 ? "" : value > 0 ? "text-gain" : "text-loss");
+const tone = (value: number | null) =>
+  value === null || value === 0 ? "" : value > 0 ? "text-gain" : "text-loss";
 
 const KindsView = () => {
   const { bets, mode } = usePanel();
@@ -46,7 +47,9 @@ const KindsView = () => {
             )}
             {rows.map((row) => (
               <tr key={row.kind} className="hover:bg-background">
-                <td className="px-4 py-2.5 font-medium">{MARKET_KIND_LABELS[row.kind] ?? row.kind}</td>
+                <td className="px-4 py-2.5 font-medium">
+                  {MARKET_KIND_LABELS[row.kind] ?? row.kind}
+                </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">
                   {row.bets}
                   {row.open > 0 && <span className="text-muted"> ({row.open} open)</span>}
@@ -57,15 +60,20 @@ const KindsView = () => {
                 <td className="px-4 py-2.5 text-right tabular-nums">{pct(row.winRate)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{pct(row.voidRate)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{money(row.staked)}</td>
-                <td className={`px-4 py-2.5 text-right tabular-nums ${tone(row.pnl)}`}>{signedMoney(row.pnl)}</td>
-                <td className={`px-4 py-2.5 text-right font-medium tabular-nums ${tone(row.roi)}`}>{pct(row.roi)}</td>
+                <td className={`px-4 py-2.5 text-right tabular-nums ${tone(row.pnl)}`}>
+                  {signedMoney(row.pnl)}
+                </td>
+                <td className={`px-4 py-2.5 text-right font-medium tabular-nums ${tone(row.roi)}`}>
+                  {pct(row.roi)}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <p className="text-xs text-muted">
-        A handful of bets per type proves little: one long shot can swing a small sample. Look for types that stay profitable as the count grows.{" "}
+        A handful of bets per type proves little: one long shot can swing a small sample. Look for
+        types that stay profitable as the count grows.{" "}
         <Link href="/bets" className="underline">
           See the bets
         </Link>

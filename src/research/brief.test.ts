@@ -10,7 +10,10 @@ FACTS:
   expect(parseBrief(text)).toEqual({
     reading: "Over 2.5 at 1.88 on Pinnacle, Sep 27",
     live: true,
-    facts: ["Italy lost 2-0 to Belgium on Sep 25 (UEFA)", "Calhanoglu out injured (Sky Sports, Sep 26)"],
+    facts: [
+      "Italy lost 2-0 to Belgium on Sep 25 (UEFA)",
+      "Calhanoglu out injured (Sky Sports, Sep 26)",
+    ],
   });
 });
 

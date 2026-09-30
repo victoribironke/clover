@@ -21,7 +21,8 @@ export const estimateCost = (model: string, usage: Usage, searchesThisMonth: num
   const freeLeft = Math.max(0, SEARCH_PRICE.freeSearchesPerMonth - searchesThisMonth);
   const paidSearches = Math.max(0, usage.searches - freeLeft);
   return (
-    (usage.inputTokens * price.inputPerMillion + usage.outputTokens * price.outputPerMillion) / 1_000_000 +
+    (usage.inputTokens * price.inputPerMillion + usage.outputTokens * price.outputPerMillion) /
+      1_000_000 +
     paidSearches * SEARCH_PRICE.perSearch
   );
 };

@@ -17,6 +17,8 @@ export const runHousekeeping = async (exchange: Exchange) => {
     .then((wallet) => publish("wallet", wallet))
     .catch((error) => log.warn("wallet snapshot failed", { error: errorMessage(error) }));
   // one-off data migration; a no-op once it has run, and never allowed to break anything
-  await backfillBetKinds(exchange).catch((error) => log.error("backfill failed", { error: errorMessage(error) }));
+  await backfillBetKinds(exchange).catch((error) =>
+    log.error("backfill failed", { error: errorMessage(error) }),
+  );
   return { recovered, settled };
 };

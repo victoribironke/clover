@@ -35,9 +35,30 @@ const bet = (overrides: Partial<Bet>): Bet => ({
 });
 
 const bets = [
-  bet({ kind: "weather", status: "won", pnl: 400, stake: 500, probability: 0.65, quotedPrice: 0.55 }),
-  bet({ kind: "weather", status: "won", pnl: 300, stake: 500, probability: 0.62, quotedPrice: 0.6 }),
-  bet({ kind: "weather", status: "lost", pnl: -500, stake: 500, probability: 0.68, quotedPrice: 0.58 }),
+  bet({
+    kind: "weather",
+    status: "won",
+    pnl: 400,
+    stake: 500,
+    probability: 0.65,
+    quotedPrice: 0.55,
+  }),
+  bet({
+    kind: "weather",
+    status: "won",
+    pnl: 300,
+    stake: 500,
+    probability: 0.62,
+    quotedPrice: 0.6,
+  }),
+  bet({
+    kind: "weather",
+    status: "lost",
+    pnl: -500,
+    stake: 500,
+    probability: 0.68,
+    quotedPrice: 0.58,
+  }),
   bet({ kind: "post-count", status: "void", pnl: 0, stake: 300 }),
   bet({ kind: "post-count", status: "placed", stake: 700 }),
   bet({ status: "lost", pnl: -200, stake: 200, probability: 0.3, quotedPrice: 0.25 }),
@@ -51,7 +72,9 @@ describe("filterBets", () => {
     expect(filterBets(bets, { mode: "paper", status: "won", kind: "all" })).toHaveLength(2);
     expect(filterBets(bets, { mode: "paper", status: "not-placed", kind: "all" })).toHaveLength(1);
     expect(filterBets(bets, { mode: "live", status: "all", kind: "all" })).toHaveLength(1);
-    expect(filterBets(bets, { mode: "paper", status: "all", kind: "unclassified" })).toHaveLength(1);
+    expect(filterBets(bets, { mode: "paper", status: "all", kind: "unclassified" })).toHaveLength(
+      1,
+    );
   });
 });
 
@@ -64,7 +87,13 @@ describe("resultsByKind", () => {
     expect(weather.roi).toBeCloseTo(200 / 1500);
   });
   test("reports void rate and open bets", () => {
-    expect(rows.find((row) => row.kind === "post-count")).toMatchObject({ bets: 2, open: 1, voided: 1, voidRate: 1, winRate: null });
+    expect(rows.find((row) => row.kind === "post-count")).toMatchObject({
+      bets: 2,
+      open: 1,
+      voided: 1,
+      voidRate: 1,
+      winRate: null,
+    });
   });
 });
 
@@ -77,9 +106,17 @@ describe("calibration", () => {
     expect(bucket.actual).toBeCloseTo(2 / 3);
   });
   test("brier score: 0 is perfect, 0.25 is a coin flip", () => {
-    const perfect = calibration([bet({ status: "won", probability: 1 }), bet({ status: "lost", probability: 0 })], "paper", "probability");
+    const perfect = calibration(
+      [bet({ status: "won", probability: 1 }), bet({ status: "lost", probability: 0 })],
+      "paper",
+      "probability",
+    );
     expect(perfect.brier).toBe(0);
-    const coin = calibration([bet({ status: "won", probability: 0.5 }), bet({ status: "lost", probability: 0.5 })], "paper", "probability");
+    const coin = calibration(
+      [bet({ status: "won", probability: 0.5 }), bet({ status: "lost", probability: 0.5 })],
+      "paper",
+      "probability",
+    );
     expect(coin.brier).toBeCloseTo(0.25);
   });
 });

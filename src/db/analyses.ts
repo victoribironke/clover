@@ -28,8 +28,15 @@ export const saveAnalysis = async (
 // Event ids researched since `sinceIso`, so a scan doesn't pay for the same deep dive twice.
 // Single-field range query only, so Firestore needs no composite index.
 export const recentlyAnalyzedEventIds = async (exchange: ExchangeName, sinceIso: string) => {
-  const snapshot = await collection("analyses").where("createdAt", ">=", sinceIso).select("exchange", "eventId").get();
-  return new Set(snapshot.docs.filter((doc) => doc.get("exchange") === exchange).map((doc) => doc.get("eventId") as string));
+  const snapshot = await collection("analyses")
+    .where("createdAt", ">=", sinceIso)
+    .select("exchange", "eventId")
+    .get();
+  return new Set(
+    snapshot.docs
+      .filter((doc) => doc.get("exchange") === exchange)
+      .map((doc) => doc.get("eventId") as string),
+  );
 };
 
 // How many deep dives ran since `sinceIso` (a count query: one read, not one per document)

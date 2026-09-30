@@ -9,23 +9,23 @@ A read-only admin panel for the Clover bot. Telegram stays where everything happ
 
 ## Pages
 
-| Page | What it answers |
-|---|---|
-| **Overview** | P&L, withdrawable profit, win rate, return on stakes, bankroll curve, the real Bayse wallet, recent results |
-| **Bets** | Every bet, filtered by paper/live, status and market type. Each opens a detail page with the research behind it (📏 reading, summary, sources) |
-| **Market types** | Win rate, void rate and return per type (weather, post counts, streams, …): which markets actually make money |
-| **Calibration** | When the bot said 70%, did it win 70% of the time? It also compares the bot's probabilities with the prices it paid (Brier score): is the research beating the market? |
-| **Research** | Every deep dive, bet or not, with the near-miss and why it passed, plus research spend |
-| **Study** | The late-price study: are prices fair 10 minutes before measurement, and void rates by type |
+| Page             | What it answers                                                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**     | P&L, withdrawable profit, win rate, return on stakes, bankroll curve, the real Bayse wallet, recent results                                                            |
+| **Bets**         | Every bet, filtered by paper/live, status and market type. Each opens a detail page with the research behind it (📏 reading, summary, sources)                         |
+| **Market types** | Win rate, void rate and return per type (weather, post counts, streams, …): which markets actually make money                                                          |
+| **Calibration**  | When the bot said 70%, did it win 70% of the time? It also compares the bot's probabilities with the prices it paid (Brier score): is the research beating the market? |
+| **Research**     | Every deep dive, bet or not, with the near-miss and why it passed, plus research spend                                                                                 |
+| **Study**        | The late-price study: are prices fair 10 minutes before measurement, and void rates by type                                                                            |
 
 ## Secrets
 
 Environment variables are secrets only:
 
-| Secret | Where to get it |
-|---|---|
-| `AUTH_SECRET` | Any long random string: `openssl rand -base64 32` |
-| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | The OAuth client created below |
+| Secret                                 | Where to get it                                   |
+| -------------------------------------- | ------------------------------------------------- |
+| `AUTH_SECRET`                          | Any long random string: `openssl rand -base64 32` |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | The OAuth client created below                    |
 
 For deployment they go in GitHub secrets, next to the bot's. For local runs, put them in `web/.env.local`.
 
@@ -34,8 +34,8 @@ For deployment they go in GitHub secrets, next to the bot's. For local runs, put
 In the Google Cloud console for `fl-clover`, open **Google Auth Platform**:
 
 1. **Branding:** set an app name (e.g. "Clover") and your support email.
-2. **Audience:** choose *External*, keep it in *Testing*, and add **ibikidsfc56@gmail.com** as a test user. Testing mode already limits sign-in to test users, as a second lock on top of `allowedEmails`.
-3. **Clients → Create client:** choose *Web application*, then add these **Authorized redirect URIs**:
+2. **Audience:** choose _External_, keep it in _Testing_, and add **ibikidsfc56@gmail.com** as a test user. Testing mode already limits sign-in to test users, as a second lock on top of `allowedEmails`.
+3. **Clients → Create client:** choose _Web application_, then add these **Authorized redirect URIs**:
    - `https://clover-uhkg4fo2na-od.a.run.app/api/auth/callback/google`
    - `http://localhost:3000/api/auth/callback/google` (for local runs)
 4. Copy the client ID and secret into `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.

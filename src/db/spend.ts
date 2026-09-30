@@ -16,12 +16,15 @@ export const recordUsage = async (model: string, usage: Usage) => {
   const costUsd = estimateCost(model, usage, searchesThisMonth);
   await Promise.all([
     dayRef(today()).set({ usd: FieldValue.increment(costUsd), day: today() }, { merge: true }),
-    usage.searches > 0 ? searchesRef().set({ count: FieldValue.increment(usage.searches) }, { merge: true }) : null,
+    usage.searches > 0
+      ? searchesRef().set({ count: FieldValue.increment(usage.searches) }, { merge: true })
+      : null,
   ]);
   return costUsd;
 };
 
-export const spendToday = async () => ((await dayRef(today()).get()).get("usd") as number | undefined) ?? 0;
+export const spendToday = async () =>
+  ((await dayRef(today()).get()).get("usd") as number | undefined) ?? 0;
 
 export const spendThisMonth = async () => {
   const month = thisMonth();
@@ -29,5 +32,8 @@ export const spendThisMonth = async () => {
     .where("day", ">=", `${month}-01`)
     .where("day", "<=", `${month}-31`)
     .get();
-  return snapshot.docs.reduce((total, doc) => total + ((doc.get("usd") as number | undefined) ?? 0), 0);
+  return snapshot.docs.reduce(
+    (total, doc) => total + ((doc.get("usd") as number | undefined) ?? 0),
+    0,
+  );
 };

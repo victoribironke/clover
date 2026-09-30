@@ -25,7 +25,12 @@ const StudyView = () => {
     );
   }
 
-  const points = summary.at10.map((bucket) => ({ label: bucket.label, predicted: bucket.avgPrice, actual: bucket.winRate, n: bucket.n }));
+  const points = summary.at10.map((bucket) => ({
+    label: bucket.label,
+    predicted: bucket.avgPrice,
+    actual: bucket.winRate,
+    n: bucket.n,
+  }));
 
   return (
     <div className="space-y-5">
@@ -39,14 +44,20 @@ const StudyView = () => {
         <StatCard
           label="Still trading after measurement"
           value={String(summary.lateOpen.n)}
-          hint={summary.lateOpen.n ? `priced ${pct(summary.lateOpen.avgPrice)} → won ${pct(summary.lateOpen.winRate)}` : "none priced 10-90% yet"}
+          hint={
+            summary.lateOpen.n
+              ? `priced ${pct(summary.lateOpen.avgPrice)} → won ${pct(summary.lateOpen.winRate)}`
+              : "none priced 10-90% yet"
+          }
         />
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-medium">Price 10 minutes out vs how often YES won</h2>
-          <p className="mb-2 text-xs text-muted">Dots above the dashed line: the market underpriced YES late on (the edge you spotted).</p>
+          <p className="mb-2 text-xs text-muted">
+            Dots above the dashed line: the market underpriced YES late on (the edge you spotted).
+          </p>
           <CalibrationChart points={points} xLabel="price 10 min before" />
         </section>
         <section className="rounded-xl border border-border bg-card p-4">
@@ -68,14 +79,18 @@ const StudyView = () => {
                   <td className="py-2 text-right tabular-nums">
                     {row.voids} ({pct(row.events ? row.voids / row.events : 0, 0)})
                   </td>
-                  <td className={`py-2 text-right tabular-nums ${row.lateGap === null ? "" : row.lateGap > 0 ? "text-gain" : "text-loss"}`}>
+                  <td
+                    className={`py-2 text-right tabular-nums ${row.lateGap === null ? "" : row.lateGap > 0 ? "text-gain" : "text-loss"}`}
+                  >
                     {row.lateGap === null ? "–" : signedPoints(row.lateGap)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-xs text-muted">Late gap: how much more often YES won than its price 10 minutes out implied.</p>
+          <p className="mt-2 text-xs text-muted">
+            Late gap: how much more often YES won than its price 10 minutes out implied.
+          </p>
         </section>
       </div>
       <p className="text-xs text-muted">Needs a few hundred markets before it means much.</p>

@@ -12,7 +12,8 @@ const withPublicOrigin =
   (request) => {
     const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
     if (!host) return handler(request);
-    const proto = request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
+    const proto =
+      request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "");
     const { pathname, search } = request.nextUrl;
     return handler(new NextRequest(`${proto}://${host}${pathname}${search}`, request));
   };

@@ -46,13 +46,27 @@ describe("buildOverview", () => {
     // live bets don't count toward the paper view
     bet({ status: "won", pnl: 5000, stake: 1000, dryRun: false }),
   ];
-  const overview = buildOverview(bets, settings, [
-    { day: "2026-09-24", usd: 0.05 },
-    { day: "2026-08-30", usd: 0.1 },
-  ], "paper", now);
+  const overview = buildOverview(
+    bets,
+    settings,
+    [
+      { day: "2026-09-24", usd: 0.05 },
+      { day: "2026-08-30", usd: 0.1 },
+    ],
+    "paper",
+    now,
+  );
 
   test("totals the paper record", () => {
-    expect(overview).toMatchObject({ realizedPnl: -220, inPlay: 1000, openBets: 1, won: 1, lost: 1, voided: 1, staked: 1220 });
+    expect(overview).toMatchObject({
+      realizedPnl: -220,
+      inPlay: 1000,
+      openBets: 1,
+      won: 1,
+      lost: 1,
+      voided: 1,
+      staked: 1220,
+    });
     expect(overview.winRate).toBeCloseTo(0.5);
     expect(overview.roi).toBeCloseTo(-220 / 1220);
   });

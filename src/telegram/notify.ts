@@ -34,7 +34,9 @@ const send = async (html: string, keyboard?: InlineKeyboard) => {
 export const notify = async (html: string, { level = "info", keyboard }: NotifyOptions = {}) => {
   if (!settings.quiet || level === "always") return send(html, keyboard);
   if (level === "alert") {
-    await recordAlert(html).catch((error) => log.error("couldn't save alert for the summary", { error: errorMessage(error) }));
+    await recordAlert(html).catch((error) =>
+      log.error("couldn't save alert for the summary", { error: errorMessage(error) }),
+    );
   }
   return null;
 };
@@ -43,7 +45,9 @@ export const notify = async (html: string, { level = "info", keyboard }: NotifyO
 export const clearButtons = async (messageId: number | null) => {
   if (!messageId) return;
   try {
-    await bot.api.editMessageReplyMarkup(config.TELEGRAM_CHAT_ID, messageId, { reply_markup: undefined });
+    await bot.api.editMessageReplyMarkup(config.TELEGRAM_CHAT_ID, messageId, {
+      reply_markup: undefined,
+    });
   } catch {
     // message too old or already edited; nothing to do
   }

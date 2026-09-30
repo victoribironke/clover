@@ -34,9 +34,11 @@ export const MARKET_KINDS: MarketKind[] = [
   "other",
 ];
 
-const MATCH_STATS = /\b(shots?|passes|corners?|cards?|bookings?|possession|fouls?|offsides?|tackles?|saves?|throw-?ins?)\b/i;
+const MATCH_STATS =
+  /\b(shots?|passes|corners?|cards?|bookings?|possession|fouls?|offsides?|tackles?|saves?|throw-?ins?)\b/i;
 
-const ENGAGEMENT = /\b(likes?|views?|reposts?|retweets?|followers?|subscribers?|impressions?|comments?|reactions?)\b/i;
+const ENGAGEMENT =
+  /\b(likes?|views?|reposts?|retweets?|followers?|subscribers?|impressions?|comments?|reactions?)\b/i;
 
 type Classifiable = Pick<MarketEvent, "title" | "category" | "resolutionDate" | "closingDate">;
 
@@ -46,13 +48,23 @@ export const marketKind = (event: Classifiable): MarketKind => {
   // results and goals are "sports"; shots, passes, corners and player stats are "match-stats"
   if (category === "PLAYER STATS") return "match-stats";
   if (category === "SPORTS") return MATCH_STATS.test(title) ? "match-stats" : "sports";
-  if (parseWeatherQuestion(event as MarketEvent) || /\b(temperature|rainfall|weather)\b/i.test(title)) return "weather";
+  if (
+    parseWeatherQuestion(event as MarketEvent) ||
+    /\b(temperature|rainfall|weather)\b/i.test(title)
+  )
+    return "weather";
   // before post counts: "likes on her latest post" mentions posts but measures engagement
   if (ENGAGEMENT.test(title)) return "engagement";
   if (isRecurringCount(event as MarketEvent)) return "post-count";
   if (/\bstreams?\b/i.test(title)) return "streams";
-  if (/\b(chart|top songs|top 10|#1 song|billboard|apple music|spotify)\b/i.test(title)) return "chart";
-  if (category === "CRYPTO" || category === "FINANCE" || /\b(price|up or down|above \$|below \$)/i.test(title)) return "price";
+  if (/\b(chart|top songs|top 10|#1 song|billboard|apple music|spotify)\b/i.test(title))
+    return "chart";
+  if (
+    category === "CRYPTO" ||
+    category === "FINANCE" ||
+    /\b(price|up or down|above \$|below \$)/i.test(title)
+  )
+    return "price";
   if (category === "ECONOMY" || category === "ECONOMICS") return "economy";
   return "other";
 };

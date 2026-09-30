@@ -21,5 +21,8 @@ export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now 
     // trading must stay open past the cancel window, and the result must land soon
     const untilClose = new Date(closeAt).getTime() - now;
     const untilResolve = new Date(resolveAt).getTime() - now;
-    return untilClose >= settings.minMinutesBeforeClose * MINUTE && untilResolve <= settings.maxHoursToResolve * HOUR;
+    return (
+      untilClose >= settings.minMinutesBeforeClose * MINUTE &&
+      untilResolve <= settings.maxHoursToResolve * HOUR
+    );
   });

@@ -19,7 +19,13 @@ export const backfillBetKinds = async (exchange: Exchange) => {
     (bet) =>
       !bet.kind ||
       (SPORTS.has((bet.category ?? "").toUpperCase()) &&
-        bet.kind !== marketKind({ title: bet.eventTitle, category: bet.category ?? "", resolutionDate: null, closingDate: null })),
+        bet.kind !==
+          marketKind({
+            title: bet.eventTitle,
+            category: bet.category ?? "",
+            resolutionDate: null,
+            closingDate: null,
+          })),
   );
   let filled = 0;
   for (const [eventId, bets] of Map.groupBy(missing, (bet) => bet.eventId)) {
@@ -32,7 +38,12 @@ export const backfillBetKinds = async (exchange: Exchange) => {
     }
     for (const bet of bets) {
       // fall back to the category already on the bet when the event can't be looked up
-      const kind = marketKind({ title: bet.eventTitle, category: category || bet.category || "", resolutionDate: null, closingDate: null });
+      const kind = marketKind({
+        title: bet.eventTitle,
+        category: category || bet.category || "",
+        resolutionDate: null,
+        closingDate: null,
+      });
       await updateBet(bet.id, category ? { category, kind } : { kind });
       filled++;
     }

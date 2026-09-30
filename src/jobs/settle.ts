@@ -17,7 +17,9 @@ export const runSettle = async (exchange: Exchange) => {
       for (const bet of bets) {
         const market = event.markets.find((item) => item.id === bet.marketId);
         const cancelled = event.status === "cancelled" || market?.status === "cancelled";
-        const resolved = (market?.status === "resolved" || event.status === "resolved") && Boolean(market?.resolvedOutcomeId);
+        const resolved =
+          (market?.status === "resolved" || event.status === "resolved") &&
+          Boolean(market?.resolvedOutcomeId);
         if (!cancelled && !resolved) continue;
 
         const shares = bet.shares ?? 0;
@@ -41,7 +43,9 @@ export const runSettle = async (exchange: Exchange) => {
   if (settled > 0) {
     const bankroll = await getBankroll(exchange);
     if (bankroll.withdrawable > 0) {
-      await notify(`💰 Withdrawable profit is now <b>${money(bankroll.withdrawable)}</b>. Capital stays at ${money(bankroll.capital)}.`);
+      await notify(
+        `💰 Withdrawable profit is now <b>${money(bankroll.withdrawable)}</b>. Capital stays at ${money(bankroll.capital)}.`,
+      );
     }
   }
   return settled;

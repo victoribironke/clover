@@ -13,7 +13,12 @@ import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
 import { proposeBet, type NearMiss } from "@/strategy/propose.ts";
-import { failureMessage, lagosTime, proposalMessage, scanReportMessage } from "@/telegram/format.ts";
+import {
+  failureMessage,
+  lagosTime,
+  proposalMessage,
+  scanReportMessage,
+} from "@/telegram/format.ts";
 import { betKeyboard, notify } from "@/telegram/notify.ts";
 import { runExecute } from "./execute.ts";
 import { runHousekeeping } from "./housekeeping.ts";
@@ -102,11 +107,23 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
 
       // re-read prices: research can take minutes and the market may have moved
       const fresh = await exchange.getEvent(event.id);
-      const { proposal, nearMiss } = await proposeBet(exchange, fresh, research.estimates, current, research.liveData);
-      const analysisId = await saveAnalysis(exchange.name, event, `${settings.reasoningModel} + ${settings.searchModel}`, research, {
-        proposed: Boolean(proposal),
-        nearMiss,
-      });
+      const { proposal, nearMiss } = await proposeBet(
+        exchange,
+        fresh,
+        research.estimates,
+        current,
+        research.liveData,
+      );
+      const analysisId = await saveAnalysis(
+        exchange.name,
+        event,
+        `${settings.reasoningModel} + ${settings.searchModel}`,
+        research,
+        {
+          proposed: Boolean(proposal),
+          nearMiss,
+        },
+      );
       reviewed.push({
         exchange: exchange.name,
         eventId: event.id,
@@ -143,7 +160,9 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
         dryRun: settings.dryRun,
         executeAt: new Date(Date.now() + settings.cancelWindowMinutes * 60_000).toISOString(),
       });
-      const messageId = await notify(proposalMessage(bet, research), { keyboard: betKeyboard(bet.id) });
+      const messageId = await notify(proposalMessage(bet, research), {
+        keyboard: betKeyboard(bet.id),
+      });
       if (messageId) await updateBet(bet.id, { telegramMessageId: messageId });
       proposed++;
     } catch (error) {
@@ -154,20 +173,32 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
     }
   }
 
-  return { open: events.length, eligible: eligible.length, researched, proposed, placed: 0, reviewed, failed };
+  return {
+    open: events.length,
+    eligible: eligible.length,
+    researched,
+    proposed,
+    placed: 0,
+    reviewed,
+    failed,
+  };
 };
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
   if (!force && (await isPaused())) return skipped("paused");
   const lock = await tryLock("scan", SCAN_LOCK_TTL);
   if (!lock.acquired) {
-    return skipped(`a scan is already running (started ${lagosTime(new Date(lock.startedAt).toISOString())}, lock clears ${lagosTime(new Date(lock.until).toISOString())} WAT)`);
+    return skipped(
+      `a scan is already running (started ${lagosTime(new Date(lock.startedAt).toISOString())}, lock clears ${lagosTime(new Date(lock.until).toISOString())} WAT)`,
+    );
   }
   const startedAt = Date.now();
 
   try {
     // settle finished bets first, so their stakes are free again for this scan's research
-    await runHousekeeping(exchange).catch((error) => log.error("housekeeping failed", { error: errorMessage(error) }));
+    await runHousekeeping(exchange).catch((error) =>
+      log.error("housekeeping failed", { error: errorMessage(error) }),
+    );
     const report = await researchAndPropose(exchange, startedAt);
     // place bets whose cancel window is over; with cancelWindowMinutes 0 that's this scan's own
     const placed = await runExecute(exchange);
@@ -179,11 +210,15 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
 
 // Runs a scan and reports it on Telegram: always when `announce` (a manual /scan),
 // otherwise only if something failed, so scheduled scans stay quiet when all is well.
-export const runScanAndReport = async (exchange: Exchange, { force = false, announce = false } = {}) => {
+export const runScanAndReport = async (
+  exchange: Exchange,
+  { force = false, announce = false } = {},
+) => {
   try {
     const report = await runScan(exchange, { force });
     // a /scan you asked for always answers; a scheduled scan only speaks up about failures
-    if (announce || report.failed.length > 0) await notify(scanReportMessage(report), { level: announce ? "always" : "alert" });
+    if (announce || report.failed.length > 0)
+      await notify(scanReportMessage(report), { level: announce ? "always" : "alert" });
     return report;
   } catch (error) {
     await notify(failureMessage("Scan failed", error), { level: announce ? "always" : "alert" });

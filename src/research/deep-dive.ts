@@ -80,7 +80,13 @@ const decideSchema = {
 const decideParse = z.object({
   summary: z.string(),
   factors: z.array(z.string()),
-  estimates: z.array(z.object({ ref: z.string(), p: z.number().min(0).max(1), c: z.enum(["low", "medium", "high"]) })),
+  estimates: z.array(
+    z.object({
+      ref: z.string(),
+      p: z.number().min(0).max(1),
+      c: z.enum(["low", "medium", "high"]),
+    }),
+  ),
 });
 
 const addUsage = (a: Usage, b: Usage): Usage => ({
@@ -130,7 +136,14 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
 
   const usage = addUsage(found.usage, decided.usage);
   const costUsd = searchCost + decideCost;
-  log.info("deep dive", { eventId: event.id, usage, costUsd, liveData, reading: brief.reading, facts: facts.length });
+  log.info("deep dive", {
+    eventId: event.id,
+    usage,
+    costUsd,
+    liveData,
+    reading: brief.reading,
+    facts: facts.length,
+  });
 
   // Without a live reading the estimate rests on history (e.g. "this artist has never done
   // 285k first-day streams") while the real number may already be close. Cap confidence at
@@ -141,7 +154,9 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
   const estimates = decided.data.estimates.flatMap((estimate) => {
     const marketId = marketIdByRef.get(estimate.ref);
     if (!marketId) return [];
-    return [{ marketId, probabilityOutcome1: estimate.p, confidence: minConfidence(estimate.c, cap) }];
+    return [
+      { marketId, probabilityOutcome1: estimate.p, confidence: minConfidence(estimate.c, cap) },
+    ];
   });
 
   return {

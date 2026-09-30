@@ -38,12 +38,17 @@ const unwrapJson = (text: string) => {
   }
 };
 
-const code = (...parts: (string | number | undefined)[]) => parts.filter((part) => part !== undefined).join(" ") || null;
+const code = (...parts: (string | number | undefined)[]) =>
+  parts.filter((part) => part !== undefined).join(" ") || null;
 
 export const describeError = (error: unknown): ErrorInfo => {
   if (error instanceof GeminiApiError) {
     const inner = unwrapJson(error.message);
-    return { source: "Gemini", code: code(error.status, inner?.status), message: inner?.message ?? error.message };
+    return {
+      source: "Gemini",
+      code: code(error.status, inner?.status),
+      message: inner?.message ?? error.message,
+    };
   }
   if (error instanceof OpenAiApiError) {
     // the SDK prefixes the status ("429 You exceeded…"); the parsed body has the plain text
@@ -66,7 +71,11 @@ export const describeError = (error: unknown): ErrorInfo => {
     return { source: "Telegram", code: String(error.error_code), message: error.description };
   }
   if (error instanceof z.ZodError) {
-    return { source: "Validation", code: null, message: error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ") };
+    return {
+      source: "Validation",
+      code: null,
+      message: error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+    };
   }
   const message = error instanceof Error ? error.message : String(error);
   const inner = unwrapJson(message);

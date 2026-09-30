@@ -10,12 +10,18 @@ export const setPaused = (paused: boolean) => kv().doc("paused").set({ value: pa
 export const publishSettings = (settings: Record<string, unknown>) => publish("settings", settings);
 
 // Snapshots the bot writes for the web panel to read (kv/<name>), stamped with when
-export const publish = (name: "settings" | "wallet" | "study-summary", data: Record<string, unknown>) =>
-  kv().doc(name).set({ ...data, publishedAt: new Date().toISOString() });
+export const publish = (
+  name: "settings" | "wallet" | "study-summary",
+  data: Record<string, unknown>,
+) =>
+  kv()
+    .doc(name)
+    .set({ ...data, publishedAt: new Date().toISOString() });
 
 // One-off markers, e.g. "this migration has run"
 export const hasFlag = async (name: string) => (await kv().doc(`flag-${name}`).get()).exists;
-export const setFlag = (name: string) => kv().doc(`flag-${name}`).set({ at: new Date().toISOString() });
+export const setFlag = (name: string) =>
+  kv().doc(`flag-${name}`).set({ at: new Date().toISOString() });
 
 export type LockResult = { acquired: true } | { acquired: false; startedAt: number; until: number };
 
@@ -33,7 +39,11 @@ export const tryLock = (name: string, ttlMs: number) =>
       const snapshot = await tx.get(ref);
       const until = snapshot.get("until") as number | undefined;
       if (until && until > now) {
-        return { acquired: false, until, startedAt: (snapshot.get("startedAt") as number | undefined) ?? until - ttlMs };
+        return {
+          acquired: false,
+          until,
+          startedAt: (snapshot.get("startedAt") as number | undefined) ?? until - ttlMs,
+        };
       }
       tx.set(ref, { until: now + ttlMs, startedAt: now });
       return { acquired: true };

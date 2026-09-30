@@ -16,7 +16,9 @@ const market = (overrides: Partial<RawMarket>): RawMarket => ({
 });
 
 test("reads the winning outcome id", () => {
-  expect(resolvedOutcomeId(market({ resolvedOutcomeId: "down-id", resolvedOutcome: "NO" }))).toBe("down-id");
+  expect(resolvedOutcomeId(market({ resolvedOutcomeId: "down-id", resolvedOutcome: "NO" }))).toBe(
+    "down-id",
+  );
 });
 
 test('maps "YES"/"NO" to outcome1/outcome2 whatever the labels are', () => {

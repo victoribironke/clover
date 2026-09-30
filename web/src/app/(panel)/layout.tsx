@@ -39,7 +39,11 @@ const PanelLayout = async ({ children }: LayoutProps<"/">) => {
                 🍀 Clover
               </Link>
               {NAV.map((item) => (
-                <Link key={item.href} href={item.href} className="shrink-0 text-muted hover:text-foreground">
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="shrink-0 text-muted hover:text-foreground"
+                >
                   {item.label}
                 </Link>
               ))}
@@ -48,7 +52,10 @@ const PanelLayout = async ({ children }: LayoutProps<"/">) => {
               <RefreshButton />
               <form action={signOutAction} className="flex items-center gap-3">
                 <span className="hidden text-muted lg:inline">{session?.user?.email}</span>
-                <button type="submit" className="rounded-md border border-border px-3 py-1.5 hover:bg-background">
+                <button
+                  type="submit"
+                  className="rounded-md border border-border px-3 py-1.5 hover:bg-background"
+                >
                   Sign out
                 </button>
               </form>

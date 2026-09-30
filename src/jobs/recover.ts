@@ -14,8 +14,15 @@ const label = (bet: Bet) => `${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)}
 
 const recoverPaper = async (bet: Bet) => {
   // nothing was sent anywhere, so it's safe to queue it again; the next tick re-quotes it
-  if (!(await updateBet(bet.id, { status: "pending", error: "interrupted while placing; retried" }, ["placing"]))) return;
-  await notify(`↩️ Paper bet ${label(bet)} was interrupted while placing. It's queued again and will be re-checked on the next run.`);
+  if (
+    !(await updateBet(bet.id, { status: "pending", error: "interrupted while placing; retried" }, [
+      "placing",
+    ]))
+  )
+    return;
+  await notify(
+    `↩️ Paper bet ${label(bet)} was interrupted while placing. It's queued again and will be re-checked on the next run.`,
+  );
 };
 
 const recoverLive = async (exchange: Exchange, bet: Bet) => {
@@ -38,7 +45,10 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
         orderId: order.id,
         fillPrice,
         shares: order.shares || bet.stake / (fillPrice * exchange.payoutPerShare),
-        error: orders.length > 1 ? `recovered; ${orders.length} matching orders found, used the first` : "recovered after interruption",
+        error:
+          orders.length > 1
+            ? `recovered; ${orders.length} matching orders found, used the first`
+            : "recovered after interruption",
       },
       ["placing"],
     );
@@ -53,7 +63,14 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
   }
 
   // No order on Bayse: nothing was bought. Orders are never retried automatically.
-  if (!(await updateBet(bet.id, { status: "failed", error: "interrupted before the order reached Bayse" }, ["placing"]))) return;
+  if (
+    !(await updateBet(
+      bet.id,
+      { status: "failed", error: "interrupted before the order reached Bayse" },
+      ["placing"],
+    ))
+  )
+    return;
   await clearButtons(bet.telegramMessageId);
   await notify(
     `⚠️ ${label(bet)} was interrupted before its order reached Bayse. Nothing was bought, and it won't be retried automatically.`,
@@ -64,7 +81,9 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
 // Runs on every tick, before new bets are executed
 export const recoverStuckBets = async (exchange: Exchange) => {
   const cutoff = Date.now() - STUCK_AFTER_MS;
-  const stuck = (await listBets(["placing"], 100)).filter((bet) => Date.parse(bet.updatedAt) < cutoff);
+  const stuck = (await listBets(["placing"], 100)).filter(
+    (bet) => Date.parse(bet.updatedAt) < cutoff,
+  );
 
   for (const bet of stuck) {
     try {

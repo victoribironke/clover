@@ -6,7 +6,11 @@ test("parses valid JSON untouched", () => {
 });
 
 test("repairs leading and trailing decimal points", () => {
-  expect(parseModelJson('{"p":.55,"q":[.1, -.2],"n":3.}')).toEqual({ p: 0.55, q: [0.1, -0.2], n: 3 });
+  expect(parseModelJson('{"p":.55,"q":[.1, -.2],"n":3.}')).toEqual({
+    p: 0.55,
+    q: [0.1, -0.2],
+    n: 3,
+  });
 });
 
 test("strips a markdown fence", () => {

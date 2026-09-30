@@ -18,12 +18,17 @@ const toPlainText = (html: string) =>
 
 export const recordAlert = async (html: string) => {
   const at = new Date().toISOString();
-  await dayRef(at.slice(0, 10)).set({ alerts: FieldValue.arrayUnion({ at, text: toPlainText(html) }) }, { merge: true });
+  await dayRef(at.slice(0, 10)).set(
+    { alerts: FieldValue.arrayUnion({ at, text: toPlainText(html) }) },
+    { merge: true },
+  );
 };
 
 // Alerts from `since` until now (reads today's and yesterday's UTC buckets)
 export const alertsSince = async (since: Date) => {
-  const days = [...new Set([since.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)])];
+  const days = [
+    ...new Set([since.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)]),
+  ];
   const docs = await Promise.all(days.map((day) => dayRef(day).get()));
   return docs
     .flatMap((doc) => (doc.get("alerts") as StoredAlert[] | undefined) ?? [])

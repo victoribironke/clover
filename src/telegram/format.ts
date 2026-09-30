@@ -10,12 +10,16 @@ import type { Bankroll } from "@/strategy/bankroll.ts";
 export const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
+const naira = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  maximumFractionDigits: 0,
+});
 export const money = (amount: number) => naira.format(amount);
 
 export const usd = (amount: number) => `$${amount.toFixed(amount < 1 ? 3 : 2)}`;
 
-export const pct =(value: number, signed = false) => {
+export const pct = (value: number, signed = false) => {
   const text = `${(value * 100).toFixed(1)}%`;
   return signed && value > 0 ? `+${text}` : text;
 };
@@ -86,13 +90,22 @@ const oneLineError = (error: unknown) => {
   return `${escapeHtml(source)}${code ? ` ${escapeHtml(code)}` : ""}: ${escapeHtml(message.slice(0, 160))}`;
 };
 
-const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const clip = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 // ➖ Portugal vs Wales: Total Goals
 // Portugal have scored in 9 straight home games…
 // Closest: Over 2.5 goals → Yes · model 58% (medium) vs market 49%
 // counted as 53.5%, costs 52.1% → +2.7% · fees and price impact eat the edge
-const reviewedLines = ({ exchange, eventId, title, summary, reading, proposed, nearMiss }: ScanReport["reviewed"][number]) => {
+const reviewedLines = ({
+  exchange,
+  eventId,
+  title,
+  summary,
+  reading,
+  proposed,
+  nearMiss,
+}: ScanReport["reviewed"][number]) => {
   const lines = [
     `${proposed ? "✅" : "➖"} ${eventLink(exchange, eventId, title)}`,
     `<i>${escapeHtml(clip(summary, 180))}</i>`,
@@ -101,7 +114,10 @@ const reviewedLines = ({ exchange, eventId, title, summary, reading, proposed, n
   if (proposed) {
     lines.push("Bet proposed, see above.");
   } else if (nearMiss) {
-    const pick = nearMiss.marketTitle === title ? nearMiss.outcomeLabel : `${nearMiss.marketTitle} → ${nearMiss.outcomeLabel}`;
+    const pick =
+      nearMiss.marketTitle === title
+        ? nearMiss.outcomeLabel
+        : `${nearMiss.marketTitle} → ${nearMiss.outcomeLabel}`;
     lines.push(
       `Closest: ${escapeHtml(pick)} · model ${pct(nearMiss.modelProbability)} (${nearMiss.confidence}) vs market ${pct(nearMiss.marketPrice)}`,
       `counted as ${pct(nearMiss.probability)}, costs ${pct(nearMiss.price)} → ${pct(nearMiss.expectedReturn, true)} · ${escapeHtml(nearMiss.reason)}`,
@@ -148,7 +164,8 @@ export const statusLine = (bet: Bet) => {
 // 📊 Late-price study: are prices near the end fair, which kinds void, and does trading after
 // the measurement time pay?
 export const studyMessage = (summary: StudySummary) => {
-  if (summary.events === 0) return "📊 <b>Late-price study</b>\nNo data yet. The study job records settled markets every 6 hours.";
+  if (summary.events === 0)
+    return "📊 <b>Late-price study</b>\nNo data yet. The study job records settled markets every 6 hours.";
   const signed = (value: number) => `${value > 0 ? "+" : ""}${(value * 100).toFixed(1)} pts`;
   const lines = [
     `📊 <b>Late-price study</b> · ${summary.events} markets since ${summary.since ? lagosTime(summary.since) : "?"}`,
@@ -156,7 +173,10 @@ export const studyMessage = (summary: StudySummary) => {
     "<b>10 min before measurement: price → how often YES won</b>",
     ...summary.at10
       .filter((bucket) => bucket.n > 0)
-      .map((bucket) => `${bucket.label}: ${bucket.n} · priced ${pct(bucket.avgPrice)} → won ${pct(bucket.winRate)}`),
+      .map(
+        (bucket) =>
+          `${bucket.label}: ${bucket.n} · priced ${pct(bucket.avgPrice)} → won ${pct(bucket.winRate)}`,
+      ),
     "<i>Won rate well above the price = late underpricing (the edge you spotted).</i>",
     "",
     "<b>By type</b> (voids · late gap)",
@@ -189,36 +209,60 @@ export type DailySummary = {
 };
 
 const LIST_LIMIT = 8;
-const more = (total: number) => (total > LIST_LIMIT ? [`<i>…and ${total - LIST_LIMIT} more</i>`] : []);
-const sum = (bets: Bet[], pick: (bet: Bet) => number) => bets.reduce((total, bet) => total + pick(bet), 0);
+const more = (total: number) =>
+  total > LIST_LIMIT ? [`<i>…and ${total - LIST_LIMIT} more</i>`] : [];
+const sum = (bets: Bet[], pick: (bet: Bet) => number) =>
+  bets.reduce((total, bet) => total + pick(bet), 0);
 const signedMoney = (amount: number) => `${amount > 0 ? "+" : ""}${money(amount)}`;
 
 // 📒 The last 24 hours in one message, for quiet mode
-export const dailySummaryMessage = ({ placed, settled, open, bankroll, wallet, spentUsd, deepDives, alerts }: DailySummary) => {
+export const dailySummaryMessage = ({
+  placed,
+  settled,
+  open,
+  bankroll,
+  wallet,
+  spentUsd,
+  deepDives,
+  alerts,
+}: DailySummary) => {
   const won = settled.filter((bet) => bet.status === "won");
   const lost = settled.filter((bet) => bet.status === "lost");
   const voided = settled.filter((bet) => bet.status === "void");
   const dayPnl = sum(settled, (bet) => bet.pnl ?? 0);
   const icon = (bet: Bet) => (bet.status === "won" ? "🏆" : bet.status === "lost" ? "❌" : "↩️");
 
-  const lines = [`📒 <b>Daily summary</b> · last 24 hours${bankroll.dryRun ? " <i>(paper)</i>" : ""}`, ""];
+  const lines = [
+    `📒 <b>Daily summary</b> · last 24 hours${bankroll.dryRun ? " <i>(paper)</i>" : ""}`,
+    "",
+  ];
 
-  lines.push(`<b>Placed:</b> ${placed.length} bets · ${money(sum(placed, (bet) => bet.stake))} staked`);
+  lines.push(
+    `<b>Placed:</b> ${placed.length} bets · ${money(sum(placed, (bet) => bet.stake))} staked`,
+  );
   for (const bet of placed.slice(0, LIST_LIMIT)) {
-    lines.push(`• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`);
+    lines.push(
+      `• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`,
+    );
   }
   lines.push(...more(placed.length), "");
 
-  lines.push(`<b>Settled:</b> ${won.length} won · ${lost.length} lost · ${voided.length} void · P&L <b>${signedMoney(dayPnl)}</b>`);
+  lines.push(
+    `<b>Settled:</b> ${won.length} won · ${lost.length} lost · ${voided.length} void · P&L <b>${signedMoney(dayPnl)}</b>`,
+  );
   for (const bet of settled.slice(0, LIST_LIMIT)) {
-    lines.push(`${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0)}`);
+    lines.push(
+      `${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0)}`,
+    );
   }
   lines.push(...more(settled.length), "");
 
   lines.push(
     `<b>Open:</b> ${open.length} bets · ${money(sum(open, (bet) => bet.stake))} in play`,
     `<b>Realized P&L:</b> ${signedMoney(bankroll.realizedPnl)} · withdrawable <b>${money(bankroll.withdrawable)}</b>`,
-    wallet ? `<b>Bayse wallet:</b> ${money(wallet.available)}` : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
+    wallet
+      ? `<b>Bayse wallet:</b> ${money(wallet.available)}`
+      : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
     `<b>Research:</b> ${deepDives} deep dives · ${usd(spentUsd)} today`,
   );
 
@@ -241,14 +285,23 @@ const walletLines = (wallet: Wallet | null, bankroll: Bankroll) => {
   if (bankroll.dryRun) {
     lines.push("<i>Real money, untouched while paper trading.</i>");
   } else if (wallet.available + bankroll.exposure < bankroll.capital) {
-    lines.push(`⚠️ Wallet plus money in play is below the ${money(bankroll.capital)} capital: the bot works with what's there.`);
+    lines.push(
+      `⚠️ Wallet plus money in play is below the ${money(bankroll.capital)} capital: the bot works with what's there.`,
+    );
   } else {
-    lines.push(`${money(Math.max(0, wallet.available + bankroll.exposure - bankroll.capital))} of it sits outside the bot's capital.`);
+    lines.push(
+      `${money(Math.max(0, wallet.available + bankroll.exposure - bankroll.capital))} of it sits outside the bot's capital.`,
+    );
   }
   return lines;
 };
 
-export const bankrollMessage = (bankroll: Bankroll, paused: boolean, spend: Spend, wallet: Wallet | null) =>
+export const bankrollMessage = (
+  bankroll: Bankroll,
+  paused: boolean,
+  spend: Spend,
+  wallet: Wallet | null,
+) =>
   [
     `<b>Clover</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
     `Capital (ceiling): ${money(bankroll.capital)}`,

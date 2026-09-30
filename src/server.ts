@@ -13,10 +13,9 @@ import { bot } from "@/telegram/bot.ts";
 const authorizedCron = (request: Request) =>
   request.headers.get("authorization") === `Bearer ${config.APP_SECRET}`;
 
-const telegramWebhook =
-  config.onCloudRun
-    ? webhookCallback(bot, "std/http", { secretToken: config.APP_SECRET })
-    : null;
+const telegramWebhook = config.onCloudRun
+  ? webhookCallback(bot, "std/http", { secretToken: config.APP_SECRET })
+  : null;
 
 const runJob = async (name: string, job: () => Promise<unknown>) => {
   try {
@@ -50,20 +49,28 @@ export const startServer = () =>
         POST: (request) => {
           if (!authorizedCron(request)) return new Response("unauthorized", { status: 401 });
           const manual = new URL(request.url).searchParams.get("manual") === "1";
-          return runJob("scan", () => runScanAndReport(exchange, { force: manual, announce: manual }));
+          return runJob("scan", () =>
+            runScanAndReport(exchange, { force: manual, announce: manual }),
+          );
         },
       },
       "/jobs/study": {
         POST: (request) =>
-          authorizedCron(request) ? runJob("study", () => runStudy(exchange)) : new Response("unauthorized", { status: 401 }),
+          authorizedCron(request)
+            ? runJob("study", () => runStudy(exchange))
+            : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/summary": {
         POST: (request) =>
-          authorizedCron(request) ? runJob("summary", () => runDailySummary(exchange)) : new Response("unauthorized", { status: 401 }),
+          authorizedCron(request)
+            ? runJob("summary", () => runDailySummary(exchange))
+            : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/tick": {
         POST: (request) =>
-          authorizedCron(request) ? runJob("tick", () => runTick(exchange)) : new Response("unauthorized", { status: 401 }),
+          authorizedCron(request)
+            ? runJob("tick", () => runTick(exchange))
+            : new Response("unauthorized", { status: 401 }),
       },
     },
     // everything else is the web panel, running next to the bot in the same container

@@ -10,7 +10,8 @@
     "tick": "bun src/cli.ts tick",
     "markets": "bun src/cli.ts markets",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@google-cloud/firestore": "^9.2.0",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
+    "prettier": "^3.9.9",
     "typescript": "^7.0.2"
   }
 }

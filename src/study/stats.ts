@@ -31,7 +31,13 @@ export type Study = {
 };
 
 export type Bucket = { label: string; n: number; avgPrice: number; winRate: number };
-export type KindRow = { kind: MarketKind; events: number; voids: number; markets: number; lateGap: number | null };
+export type KindRow = {
+  kind: MarketKind;
+  events: number;
+  voids: number;
+  markets: number;
+  lateGap: number | null;
+};
 export type StudySummary = {
   events: number;
   since: string | null;
@@ -50,11 +56,14 @@ const BUCKETS: [number, number, string][] = [
   [0.8, 1.01, "80-100%"],
 ];
 
-const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+const mean = (values: number[]) =>
+  values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
 
 export const summarize = (studies: Study[]): StudySummary => {
   const settled = studies.flatMap((study) =>
-    study.status === "resolved" ? study.markets.filter((market) => market.won !== null).map((market) => ({ study, market })) : [],
+    study.status === "resolved"
+      ? study.markets.filter((market) => market.won !== null).map((market) => ({ study, market }))
+      : [],
   );
 
   const priced = settled.filter(({ market }) => market.at10 !== null);
@@ -79,12 +88,16 @@ export const summarize = (studies: Study[]): StudySummary => {
         voids: ofKind.filter((study) => study.status === "cancelled").length,
         markets: markets.length,
         // positive: YES won more often than its price 10 minutes out implied (late underpricing)
-        lateGap: markets.length ? mean(markets.map(({ market }) => (market.won ? 1 : 0) - market.at10!)) : null,
+        lateGap: markets.length
+          ? mean(markets.map(({ market }) => (market.won ? 1 : 0) - market.at10!))
+          : null,
       };
     })
     .sort((a, b) => b.events - a.events);
 
-  const late = settled.filter(({ market }) => market.after15 !== null && market.after15 > 0.1 && market.after15 < 0.9);
+  const late = settled.filter(
+    ({ market }) => market.after15 !== null && market.after15 > 0.1 && market.after15 < 0.9,
+  );
   const since = studies.map((study) => study.recordedAt).sort()[0] ?? null;
 
   return {

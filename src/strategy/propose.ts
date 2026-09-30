@@ -57,9 +57,19 @@ const priceStake = async (
   initialStake: number,
 ): Promise<Priced> => {
   let stake = initialStake;
-  let last: Priced = { ok: false, quotedPrice: outcome.price, expectedReturn: 0, reason: "no quote" };
+  let last: Priced = {
+    ok: false,
+    quotedPrice: outcome.price,
+    expectedReturn: 0,
+    reason: "no quote",
+  };
   for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= market.minOrderAmount; attempt++) {
-    const quote = await exchange.quote({ eventId: event.id, marketId: market.id, outcomeId: outcome.id, amount: stake });
+    const quote = await exchange.quote({
+      eventId: event.id,
+      marketId: market.id,
+      outcomeId: outcome.id,
+      amount: stake,
+    });
     const edge = expectedReturn(probability, quote.avgPrice);
     if (quote.completeFill && edge >= settings.minEdge) {
       return { ok: true, stake, quotedPrice: quote.avgPrice, expectedReturn: edge };
@@ -68,7 +78,9 @@ const priceStake = async (
       ok: false,
       quotedPrice: quote.avgPrice,
       expectedReturn: edge,
-      reason: quote.completeFill ? `fees and price impact eat the edge (needs ${needs})` : "not enough liquidity",
+      reason: quote.completeFill
+        ? `fees and price impact eat the edge (needs ${needs})`
+        : "not enough liquidity",
     };
     stake = Math.floor(stake / 2);
   }
@@ -85,16 +97,23 @@ export const proposeBet = async (
 ): Promise<Verdict> => {
   const candidates: Proposal[] = [];
   const misses: NearMiss[] = [];
-  const blocked = !liveData && (settings.liveReadingRequiredKinds as readonly string[]).includes(marketKind(event));
+  const blocked =
+    !liveData &&
+    (settings.liveReadingRequiredKinds as readonly string[]).includes(marketKind(event));
 
   for (const estimate of estimates) {
     const market = event.markets.find((item) => item.id === estimate.marketId);
     if (!market || market.status !== "open") continue;
 
     for (const [index, outcome] of market.outcomes.entries()) {
-      if (outcome.price < Math.max(MIN_PRICE, settings.minOutcomePrice) || outcome.price > MAX_PRICE) continue;
+      if (
+        outcome.price < Math.max(MIN_PRICE, settings.minOutcomePrice) ||
+        outcome.price > MAX_PRICE
+      )
+        continue;
 
-      const modelProbability = index === 0 ? estimate.probabilityOutcome1 : 1 - estimate.probabilityOutcome1;
+      const modelProbability =
+        index === 0 ? estimate.probabilityOutcome1 : 1 - estimate.probabilityOutcome1;
       const probability = blendProbability(modelProbability, outcome.price, estimate.confidence);
       const miss = (price: number, edge: number, reason: string) =>
         misses.push({
@@ -116,7 +135,11 @@ export const proposeBet = async (
         continue;
       }
       if (blocked) {
-        miss(outcome.price, listedEdge, "no bet without a live reading (for sports: bookmaker odds for this line)");
+        miss(
+          outcome.price,
+          listedEdge,
+          "no bet without a live reading (for sports: bookmaker odds for this line)",
+        );
         continue;
       }
 
@@ -131,7 +154,11 @@ export const proposeBet = async (
         minimumStakeFraction: settings.minimumStakeFraction,
       });
       if (stake === 0) {
-        miss(outcome.price, listedEdge, `stake would be under the ₦${market.minOrderAmount} minimum, which is too big a share of the bankroll`);
+        miss(
+          outcome.price,
+          listedEdge,
+          `stake would be under the ₦${market.minOrderAmount} minimum, which is too big a share of the bankroll`,
+        );
         continue;
       }
 

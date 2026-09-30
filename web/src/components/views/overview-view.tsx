@@ -14,12 +14,18 @@ const tone = (value: number) => (value > 0 ? "gain" : value < 0 ? "loss" : "neut
 
 const OverviewView = () => {
   const { bets, botSettings, spend, wallet, mode, fetchedAt } = usePanel();
-  const overview = useMemo(() => buildOverview(bets, botSettings, spend, mode, new Date(fetchedAt)), [bets, botSettings, spend, mode, fetchedAt]);
+  const overview = useMemo(
+    () => buildOverview(bets, botSettings, spend, mode, new Date(fetchedAt)),
+    [bets, botSettings, spend, mode, fetchedAt],
+  );
 
   const recent = useMemo(
     () =>
       bets
-        .filter((bet) => bet.dryRun === (mode === "paper") && ["won", "lost", "void"].includes(bet.status))
+        .filter(
+          (bet) =>
+            bet.dryRun === (mode === "paper") && ["won", "lost", "void"].includes(bet.status),
+        )
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
         .slice(0, 10),
     [bets, mode],
@@ -43,14 +49,49 @@ const OverviewView = () => {
       />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Realized P&L" value={signedMoney(overview.realizedPnl)} tone={tone(overview.realizedPnl)} hint={`on ${money(overview.staked)} staked`} />
-        <StatCard label="Withdrawable" value={money(overview.withdrawable)} hint={`capital ${money(overview.capital)}`} />
-        <StatCard label="Win rate" value={pct(overview.winRate)} hint={`${overview.won} won · ${overview.lost} lost · ${overview.voided} void`} />
-        <StatCard label="Return on stakes" value={pct(overview.roi)} tone={tone(overview.roi ?? 0)} hint="P&L ÷ amount staked" />
-        <StatCard label="Working bankroll" value={money(overview.workingBankroll)} hint="capital, or less after losses" />
-        <StatCard label="In play" value={money(overview.inPlay)} hint={`${overview.openBets} open bets`} />
-        <StatCard label="Research this month" value={usd(overview.researchSpendMonthUsd)} hint={`${usd(overview.researchSpendUsd)} all time`} />
-        <StatCard label="Bayse wallet" value={wallet ? money(wallet.available) : "–"} hint={walletHint} tone={walletHint.startsWith("⚠️") ? "loss" : "neutral"} />
+        <StatCard
+          label="Realized P&L"
+          value={signedMoney(overview.realizedPnl)}
+          tone={tone(overview.realizedPnl)}
+          hint={`on ${money(overview.staked)} staked`}
+        />
+        <StatCard
+          label="Withdrawable"
+          value={money(overview.withdrawable)}
+          hint={`capital ${money(overview.capital)}`}
+        />
+        <StatCard
+          label="Win rate"
+          value={pct(overview.winRate)}
+          hint={`${overview.won} won · ${overview.lost} lost · ${overview.voided} void`}
+        />
+        <StatCard
+          label="Return on stakes"
+          value={pct(overview.roi)}
+          tone={tone(overview.roi ?? 0)}
+          hint="P&L ÷ amount staked"
+        />
+        <StatCard
+          label="Working bankroll"
+          value={money(overview.workingBankroll)}
+          hint="capital, or less after losses"
+        />
+        <StatCard
+          label="In play"
+          value={money(overview.inPlay)}
+          hint={`${overview.openBets} open bets`}
+        />
+        <StatCard
+          label="Research this month"
+          value={usd(overview.researchSpendMonthUsd)}
+          hint={`${usd(overview.researchSpendUsd)} all time`}
+        />
+        <StatCard
+          label="Bayse wallet"
+          value={wallet ? money(wallet.available) : "–"}
+          hint={walletHint}
+          tone={walletHint.startsWith("⚠️") ? "loss" : "neutral"}
+        />
       </section>
 
       <section className="rounded-xl border border-border bg-card p-4">
@@ -65,17 +106,26 @@ const OverviewView = () => {
         ) : (
           <ul className="divide-y divide-border">
             {recent.map((bet) => (
-              <li key={bet.id} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+              <li
+                key={bet.id}
+                className="flex items-center justify-between gap-4 px-4 py-3 text-sm"
+              >
                 <div className="min-w-0">
-                  <Link href={`/bets/${bet.id}`} className="block truncate font-medium hover:underline">
+                  <Link
+                    href={`/bets/${bet.id}`}
+                    className="block truncate font-medium hover:underline"
+                  >
                     {bet.eventTitle}
                   </Link>
                   <p className="truncate text-xs text-muted">
                     {bet.marketTitle !== bet.eventTitle ? `${bet.marketTitle} → ` : ""}
-                    {bet.outcomeLabel} · {money(bet.stake)} at {pct(bet.quotedPrice)} · {bet.kind ?? "unclassified"} · {lagosDateTime(bet.updatedAt)}
+                    {bet.outcomeLabel} · {money(bet.stake)} at {pct(bet.quotedPrice)} ·{" "}
+                    {bet.kind ?? "unclassified"} · {lagosDateTime(bet.updatedAt)}
                   </p>
                 </div>
-                <span className={`shrink-0 font-medium tabular-nums ${STATUS_STYLE[bet.status] ?? ""}`}>
+                <span
+                  className={`shrink-0 font-medium tabular-nums ${STATUS_STYLE[bet.status] ?? ""}`}
+                >
                   {bet.status === "void" ? "void" : signedMoney(bet.pnl ?? 0)}
                 </span>
               </li>

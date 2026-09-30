@@ -8,15 +8,7 @@ import { collection, firestore } from "./firestore.ts";
 // won/lost/void -> settled
 // cancelled/skipped/failed -> never placed
 export type BetStatus =
-  | "pending"
-  | "placing"
-  | "placed"
-  | "won"
-  | "lost"
-  | "void"
-  | "cancelled"
-  | "skipped"
-  | "failed";
+  "pending" | "placing" | "placed" | "won" | "lost" | "void" | "cancelled" | "skipped" | "failed";
 
 export type Confidence = "low" | "medium" | "high";
 
@@ -57,7 +49,16 @@ export type Bet = {
 
 export type NewBet = Omit<
   Bet,
-  "id" | "status" | "orderId" | "fillPrice" | "shares" | "pnl" | "error" | "telegramMessageId" | "createdAt" | "updatedAt"
+  | "id"
+  | "status"
+  | "orderId"
+  | "fillPrice"
+  | "shares"
+  | "pnl"
+  | "error"
+  | "telegramMessageId"
+  | "createdAt"
+  | "updatedAt"
 >;
 
 type BetPatch = Partial<
@@ -79,7 +80,17 @@ type BetPatch = Partial<
   >
 >;
 
-export const ALL_STATUSES: BetStatus[] = ["pending", "placing", "placed", "won", "lost", "void", "cancelled", "skipped", "failed"];
+export const ALL_STATUSES: BetStatus[] = [
+  "pending",
+  "placing",
+  "placed",
+  "won",
+  "lost",
+  "void",
+  "cancelled",
+  "skipped",
+  "failed",
+];
 
 const LIVE: BetStatus[] = ["pending", "placing", "placed"];
 const SETTLED: BetStatus[] = ["won", "lost", "void"];
@@ -142,7 +153,8 @@ export const updateBet = (id: string, patch: BetPatch, fromStatuses?: BetStatus[
     const ref = bets().doc(id);
     const snapshot = await tx.get(ref);
     if (!snapshot.exists) return false;
-    if (fromStatuses?.length && !fromStatuses.includes(snapshot.get("status") as BetStatus)) return false;
+    if (fromStatuses?.length && !fromStatuses.includes(snapshot.get("status") as BetStatus))
+      return false;
     tx.update(ref, { ...patch, updatedAt: new Date().toISOString() });
     return true;
   });
@@ -158,10 +170,20 @@ export type BetTotals = {
 export const betTotals = async (exchange: ExchangeName, dryRun: boolean): Promise<BetTotals> => {
   const all = await listBets([...LIVE, ...SETTLED], 10_000);
   const mine = all.filter((bet) => bet.exchange === exchange && bet.dryRun === dryRun);
-  const sum = (items: Bet[], pick: (bet: Bet) => number) => items.reduce((total, bet) => total + pick(bet), 0);
+  const sum = (items: Bet[], pick: (bet: Bet) => number) =>
+    items.reduce((total, bet) => total + pick(bet), 0);
   return {
-    exposure: sum(mine.filter((bet) => LIVE.includes(bet.status)), (bet) => bet.stake),
-    realizedPnl: sum(mine.filter((bet) => SETTLED.includes(bet.status)), (bet) => bet.pnl ?? 0),
-    unsent: sum(mine.filter((bet) => bet.status === "pending" || bet.status === "placing"), (bet) => bet.stake),
+    exposure: sum(
+      mine.filter((bet) => LIVE.includes(bet.status)),
+      (bet) => bet.stake,
+    ),
+    realizedPnl: sum(
+      mine.filter((bet) => SETTLED.includes(bet.status)),
+      (bet) => bet.pnl ?? 0,
+    ),
+    unsent: sum(
+      mine.filter((bet) => bet.status === "pending" || bet.status === "placing"),
+      (bet) => bet.stake,
+    ),
   };
 };

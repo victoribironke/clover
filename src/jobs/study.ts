@@ -17,7 +17,12 @@ const MIN_LIFETIME_HOURS = 3;
 export const worthStudying = (event: MarketEvent) => {
   if (NOISE.test(event.title)) return false;
   const close = event.closingDate ?? event.resolutionDate;
-  if (event.openingDate && close && Date.parse(close) - Date.parse(event.openingDate) < MIN_LIFETIME_HOURS * HOUR) return false;
+  if (
+    event.openingDate &&
+    close &&
+    Date.parse(close) - Date.parse(event.openingDate) < MIN_LIFETIME_HOURS * HOUR
+  )
+    return false;
   return true;
 };
 
@@ -26,15 +31,21 @@ export const worthStudying = (event: MarketEvent) => {
 // short-lived series.
 const openedLate = (event: MarketEvent, history: PriceHistory, windowStart: Date) => {
   const close = event.closingDate ?? event.resolutionDate;
-  const firstPoint = Math.min(...Object.values(history).flatMap((series) => series.map((point) => point.t)));
+  const firstPoint = Math.min(
+    ...Object.values(history).flatMap((series) => series.map((point) => point.t)),
+  );
   if (!close || !Number.isFinite(firstPoint)) return false;
-  return firstPoint > windowStart.getTime() + HOUR && Date.parse(close) - firstPoint < MIN_LIFETIME_HOURS * HOUR;
+  return (
+    firstPoint > windowStart.getTime() + HOUR &&
+    Date.parse(close) - firstPoint < MIN_LIFETIME_HOURS * HOUR
+  );
 };
 
 // Records how settled markets were priced near the end, plus voids, so we can check whether
 // late prices are systematically off (and by which kind) before betting on it. No Gemini calls.
 export const runStudy = async (exchange: Exchange) => {
-  if (!(await tryLock("study", 30 * 60_000)).acquired) return { recorded: 0, skippedReason: "study already running" };
+  if (!(await tryLock("study", 30 * 60_000)).acquired)
+    return { recorded: 0, skippedReason: "study already running" };
   const since = new Date(Date.now() - LOOKBACK_HOURS * HOUR);
   let recorded = 0;
   let failed = 0;
@@ -47,7 +58,8 @@ export const runStudy = async (exchange: Exchange) => {
         try {
           // voids only count toward void rates; price paths matter for resolved events
           const { anchorAt } = anchorFor(event);
-          const history = status === "resolved" && anchorAt !== null ? await exchange.priceHistory(event.id) : {};
+          const history =
+            status === "resolved" && anchorAt !== null ? await exchange.priceHistory(event.id) : {};
           if (openedLate(event, history, since)) continue;
           const study: Study = buildStudy(event, status, history);
           await ref.set(study);
@@ -66,4 +78,5 @@ export const runStudy = async (exchange: Exchange) => {
   }
 };
 
-export const loadStudies = async () => (await collection("studies").get()).docs.map((doc) => doc.data() as Study);
+export const loadStudies = async () =>
+  (await collection("studies").get()).docs.map((doc) => doc.data() as Study);

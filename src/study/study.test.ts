@@ -48,29 +48,51 @@ describe("measurementTime", () => {
     expect(measurementTime(event({}))?.toISOString()).toBe("2026-09-25T12:00:00.000Z");
   });
   test("reads weather times", () => {
-    const weather = event({ title: "Will the Temperature in Lagos, Nigeria be  above 28°C by 5:00 PM WAT on Sept 26?", resolutionDate: "2026-09-26T22:59:00Z" });
+    const weather = event({
+      title: "Will the Temperature in Lagos, Nigeria be  above 28°C by 5:00 PM WAT on Sept 26?",
+      resolutionDate: "2026-09-26T22:59:00Z",
+    });
     expect(measurementTime(weather)?.toISOString()).toBe("2026-09-26T16:00:00.000Z");
   });
   test("respects GMT in the title", () => {
-    const fx = event({ title: "Will EUR/GBP be higher than £0.86019 by 6:00 PM GMT?", resolutionDate: "2026-09-25T18:05:00Z" });
+    const fx = event({
+      title: "Will EUR/GBP be higher than £0.86019 by 6:00 PM GMT?",
+      resolutionDate: "2026-09-25T18:05:00Z",
+    });
     expect(measurementTime(fx)?.toISOString()).toBe("2026-09-25T18:00:00.000Z");
   });
   test("respects US Eastern time", () => {
-    const elon = event({ title: "Elon posts by 12 PM ET?", resolutionDate: "2026-09-29T16:00:00Z" });
+    const elon = event({
+      title: "Elon posts by 12 PM ET?",
+      resolutionDate: "2026-09-29T16:00:00Z",
+    });
     expect(measurementTime(elon)?.toISOString()).toBe("2026-09-29T16:00:00.000Z");
   });
   test("null when the title names no time", () => {
-    expect(measurementTime(event({ title: "Elon Musk's Number of Posts September 22 - September 29, 2026?" }))).toBeNull();
+    expect(
+      measurementTime(
+        event({ title: "Elon Musk's Number of Posts September 22 - September 29, 2026?" }),
+      ),
+    ).toBeNull();
   });
 });
 
 describe("anchorFor", () => {
   test("uses the measurement time when it comes before the close", () => {
-    expect(anchorFor(event({}))).toMatchObject({ anchorIsMeasurement: true, anchorAt: Date.parse("2026-09-25T12:00:00Z") });
+    expect(anchorFor(event({}))).toMatchObject({
+      anchorIsMeasurement: true,
+      anchorAt: Date.parse("2026-09-25T12:00:00Z"),
+    });
   });
   test("falls back to the close", () => {
-    const e = event({ title: "Elon Musk's Number of Posts September 22 - September 29, 2026?", closingDate: "2026-09-29T15:59:00Z" });
-    expect(anchorFor(e)).toMatchObject({ anchorIsMeasurement: false, anchorAt: Date.parse("2026-09-29T15:59:00Z") });
+    const e = event({
+      title: "Elon Musk's Number of Posts September 22 - September 29, 2026?",
+      closingDate: "2026-09-29T15:59:00Z",
+    });
+    expect(anchorFor(e)).toMatchObject({
+      anchorIsMeasurement: false,
+      anchorAt: Date.parse("2026-09-29T15:59:00Z"),
+    });
   });
 });
 
@@ -103,7 +125,13 @@ describe("buildStudy", () => {
   const study = buildStudy(event({}), "resolved", history, Date.parse("2026-09-25T23:30:00Z"));
 
   test("records prices before the measurement time and the result", () => {
-    expect(study.markets[0]).toMatchObject({ won: true, at60: 0.3, at30: 0.5, at10: 0.7, after15: 0.96 });
+    expect(study.markets[0]).toMatchObject({
+      won: true,
+      at60: 0.3,
+      at30: 0.5,
+      at10: 0.7,
+      after15: 0.96,
+    });
     expect(study.kind).toBe("post-count");
   });
   test("keeps a 5-minute path over the final hours", () => {
@@ -115,7 +143,11 @@ describe("buildStudy", () => {
 });
 
 describe("summarize", () => {
-  const study = (kind: Study["kind"], status: Study["status"], markets: { at10: number; won: boolean }[]): Study => ({
+  const study = (
+    kind: Study["kind"],
+    status: Study["status"],
+    markets: { at10: number; won: boolean }[],
+  ): Study => ({
     eventId: Math.random().toString(),
     title: "",
     category: "",
@@ -157,7 +189,13 @@ describe("summarize", () => {
       study("engagement", "resolved", [{ at10: 0.5, won: true }]),
       study("weather", "resolved", [{ at10: 0.5, won: true }]),
     ]);
-    expect(summary.byKind.find((row) => row.kind === "engagement")).toMatchObject({ events: 2, voids: 1 });
-    expect(summary.byKind.find((row) => row.kind === "weather")).toMatchObject({ events: 1, voids: 0 });
+    expect(summary.byKind.find((row) => row.kind === "engagement")).toMatchObject({
+      events: 2,
+      voids: 1,
+    });
+    expect(summary.byKind.find((row) => row.kind === "weather")).toMatchObject({
+      events: 1,
+      voids: 0,
+    });
   });
 });

@@ -4,7 +4,15 @@
 // request open for many minutes, which a proxy inside Next.js would time out.
 export const PANEL_PORT = 3000;
 
-const HOP_BY_HOP = ["connection", "keep-alive", "transfer-encoding", "upgrade", "proxy-connection", "te", "trailer"];
+const HOP_BY_HOP = [
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "upgrade",
+  "proxy-connection",
+  "te",
+  "trailer",
+];
 
 export const proxyToPanel = async (request: Request, publicProto: "http" | "https") => {
   const incoming = new URL(request.url);
@@ -22,17 +30,26 @@ export const proxyToPanel = async (request: Request, publicProto: "http" | "http
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   try {
-    const response = await fetch(`http://127.0.0.1:${PANEL_PORT}${incoming.pathname}${incoming.search}`, {
-      method: request.method,
-      headers,
-      body: hasBody ? await request.arrayBuffer() : undefined,
-      // redirects (e.g. to Google sign-in) go back to the browser as-is
-      redirect: "manual",
-    });
+    const response = await fetch(
+      `http://127.0.0.1:${PANEL_PORT}${incoming.pathname}${incoming.search}`,
+      {
+        method: request.method,
+        headers,
+        body: hasBody ? await request.arrayBuffer() : undefined,
+        // redirects (e.g. to Google sign-in) go back to the browser as-is
+        redirect: "manual",
+      },
+    );
     const outgoing = new Headers(response.headers);
     for (const name of HOP_BY_HOP) outgoing.delete(name);
-    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: outgoing,
+    });
   } catch {
-    return new Response("The panel isn't running (it starts a few seconds after the bot).", { status: 502 });
+    return new Response("The panel isn't running (it starts a few seconds after the bot).", {
+      status: 502,
+    });
   }
 };

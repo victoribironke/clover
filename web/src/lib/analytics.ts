@@ -15,7 +15,10 @@ export const STATUS_GROUPS: StatusGroup[] = ["all", "open", "won", "lost", "void
 
 export const kindOf = (bet: Bet): MarketKind | "unclassified" => bet.kind ?? "unclassified";
 
-export const filterBets = (bets: Bet[], filter: { mode: Mode; status: StatusGroup; kind: string }) =>
+export const filterBets = (
+  bets: Bet[],
+  filter: { mode: Mode; status: StatusGroup; kind: string },
+) =>
   bets
     .filter((bet) => bet.dryRun === (filter.mode === "paper"))
     .filter((bet) => filter.status === "all" || GROUPS[filter.status].includes(bet.status))
@@ -38,7 +41,9 @@ export type KindRow = {
 
 // Per market type: did the bets that actually settled make money?
 export const resultsByKind = (bets: Bet[], mode: Mode): KindRow[] => {
-  const mine = bets.filter((bet) => bet.dryRun === (mode === "paper") && !GROUPS["not-placed"].includes(bet.status));
+  const mine = bets.filter(
+    (bet) => bet.dryRun === (mode === "paper") && !GROUPS["not-placed"].includes(bet.status),
+  );
   const rows = Map.groupBy(mine, kindOf);
   return [...rows.entries()]
     .map(([kind, group]) => {
@@ -66,7 +71,14 @@ export const resultsByKind = (bets: Bet[], mode: Mode): KindRow[] => {
     .sort((a, b) => b.bets - a.bets);
 };
 
-export type CalibrationBucket = { label: string; low: number; high: number; n: number; predicted: number; actual: number };
+export type CalibrationBucket = {
+  label: string;
+  low: number;
+  high: number;
+  n: number;
+  predicted: number;
+  actual: number;
+};
 
 export type Calibration = {
   buckets: CalibrationBucket[];
@@ -79,12 +91,19 @@ const BUCKET_EDGES = [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001];
 
 // Were the bot's probabilities right? `field` picks what's being judged: the probability the bot
 // bet on (its blend of research and market), or the price it paid (the market's own view).
-export const calibration = (bets: Bet[], mode: Mode, field: "probability" | "quotedPrice"): Calibration => {
-  const decided = bets.filter((bet) => bet.dryRun === (mode === "paper") && (bet.status === "won" || bet.status === "lost"));
+export const calibration = (
+  bets: Bet[],
+  mode: Mode,
+  field: "probability" | "quotedPrice",
+): Calibration => {
+  const decided = bets.filter(
+    (bet) => bet.dryRun === (mode === "paper") && (bet.status === "won" || bet.status === "lost"),
+  );
   const buckets = BUCKET_EDGES.slice(0, -1).map((low, index) => {
     const high = BUCKET_EDGES[index + 1]!;
     const inBucket = decided.filter((bet) => bet[field] >= low && bet[field] < high);
-    const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+    const mean = (values: number[]) =>
+      values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
     return {
       label: `${Math.round(low * 100)}-${Math.min(100, Math.round(high * 100))}%`,
       low,
@@ -95,7 +114,10 @@ export const calibration = (bets: Bet[], mode: Mode, field: "probability" | "quo
     };
   });
   const brier = decided.length
-    ? decided.reduce((total, bet) => total + (bet[field] - (bet.status === "won" ? 1 : 0)) ** 2, 0) / decided.length
+    ? decided.reduce(
+        (total, bet) => total + (bet[field] - (bet.status === "won" ? 1 : 0)) ** 2,
+        0,
+      ) / decided.length
     : null;
   return { buckets, n: decided.length, brier };
 };

@@ -1,5 +1,13 @@
 import "server-only";
-import { loadAnalysesByIds, loadAnalyses, loadBets, loadBotSettings, loadSpend, loadStudySummary, loadWallet } from "./data";
+import {
+  loadAnalysesByIds,
+  loadAnalyses,
+  loadBets,
+  loadBotSettings,
+  loadSpend,
+  loadStudySummary,
+  loadWallet,
+} from "./data";
 import type { Analysis, Bet, BotSettings, SpendDay, StudySummary, WalletSnapshot } from "./types";
 
 // Everything the panel shows, loaded once by the panel layout. Pages read it from context, so
@@ -26,8 +34,20 @@ export const loadPanelData = async (): Promise<PanelData> => {
     loadStudySummary(),
   ]);
   const have = new Set(recent.map((analysis) => analysis.id));
-  const missing = [...new Set(bets.map((bet) => bet.analysisId).filter((id): id is string => Boolean(id) && !have.has(id!)))];
+  const missing = [
+    ...new Set(
+      bets.map((bet) => bet.analysisId).filter((id): id is string => Boolean(id) && !have.has(id!)),
+    ),
+  ];
   const older = await loadAnalysesByIds(missing);
 
-  return { bets, analyses: [...recent, ...older], botSettings, spend, wallet, study, fetchedAt: new Date().toISOString() };
+  return {
+    bets,
+    analyses: [...recent, ...older],
+    botSettings,
+    spend,
+    wallet,
+    study,
+    fetchedAt: new Date().toISOString(),
+  };
 };

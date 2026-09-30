@@ -125,8 +125,16 @@ export const resolvedOutcomeId = (market: RawMarket) => {
 };
 
 const toMarket = (market: RawMarket): Market => {
-  const outcome1: Outcome = { id: market.outcome1Id, label: market.outcome1Label, price: market.outcome1Price };
-  const outcome2: Outcome = { id: market.outcome2Id, label: market.outcome2Label, price: market.outcome2Price };
+  const outcome1: Outcome = {
+    id: market.outcome1Id,
+    label: market.outcome1Label,
+    price: market.outcome1Price,
+  };
+  const outcome2: Outcome = {
+    id: market.outcome2Id,
+    label: market.outcome2Label,
+    price: market.outcome2Price,
+  };
   return {
     id: market.id,
     title: market.title,
@@ -186,15 +194,20 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     );
 
   const quote: Exchange["quote"] = async ({ eventId, marketId, outcomeId, amount }) => {
-    const raw = await http.request<RawQuote>("POST", `/v1/pm/events/${eventId}/markets/${marketId}/quote`, {
-      auth: "read",
-      body: { side: "BUY", outcomeId, amount, currency: CURRENCY },
-    });
+    const raw = await http.request<RawQuote>(
+      "POST",
+      `/v1/pm/events/${eventId}/markets/${marketId}/quote`,
+      {
+        auth: "read",
+        body: { side: "BUY", outcomeId, amount, currency: CURRENCY },
+      },
+    );
     // Derive the price actually paid from shares received. On CLOB buys the fee is
     // taken out of the shares, so `raw.price` alone understates the real cost.
     const multiplier = raw.currencyBaseMultiplier ?? 100;
     const result: Quote = {
-      avgPrice: raw.quantity > 0 ? raw.amount / (raw.quantity * multiplier) : Number.POSITIVE_INFINITY,
+      avgPrice:
+        raw.quantity > 0 ? raw.amount / (raw.quantity * multiplier) : Number.POSITIVE_INFINITY,
       amount: raw.amount,
       shares: raw.quantity,
       fee: raw.fee ?? 0,
@@ -204,7 +217,13 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     return result;
   };
 
-  const placeOrder: Exchange["placeOrder"] = async ({ eventId, marketId, outcomeId, amount, maxSlippage }) => {
+  const placeOrder: Exchange["placeOrder"] = async ({
+    eventId,
+    marketId,
+    outcomeId,
+    amount,
+    maxSlippage,
+  }) => {
     const { order } = await http.request<RawOrderResponse>(
       "POST",
       `/v1/pm/events/${eventId}/markets/${marketId}/orders`,
@@ -233,7 +252,8 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
   const listSettledEvents: Exchange["listSettledEvents"] = async (status, since) => {
     const events: MarketEvent[] = [];
     const cutoff = since.getTime();
-    const settledAt = (event: MarketEvent) => Date.parse(event.resolvedAt ?? event.resolutionDate ?? event.closingDate ?? "") || 0;
+    const settledAt = (event: MarketEvent) =>
+      Date.parse(event.resolvedAt ?? event.resolutionDate ?? event.closingDate ?? "") || 0;
     for (let page = 1; page <= 100; page++) {
       const result = await http.request<RawEventsPage>("GET", "/v1/pm/events", {
         auth: "read",
@@ -241,7 +261,8 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
       });
       const batch = result.events.map(toEvent);
       events.push(...batch.filter((event) => settledAt(event) >= cutoff));
-      if (batch.every((event) => settledAt(event) < cutoff) || page >= result.pagination.lastPage) break;
+      if (batch.every((event) => settledAt(event) < cutoff) || page >= result.pagination.lastPage)
+        break;
     }
     return events;
   };
@@ -249,11 +270,12 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
   // The live response is { markets: [{ marketId, priceHistory: [{ e: epochMs, p: price }] }] },
   // not the map shown in the docs. 12H gives 1-minute points.
   const priceHistory: Exchange["priceHistory"] = async (eventId) => {
-    const result = await http.request<{ markets?: { marketId: string; priceHistory?: { e: number; p: number }[] }[] }>(
-      "GET",
-      `/v1/pm/events/${eventId}/price-history`,
-      { auth: "read", query: { timePeriod: "12H" } },
-    );
+    const result = await http.request<{
+      markets?: { marketId: string; priceHistory?: { e: number; p: number }[] }[];
+    }>("GET", `/v1/pm/events/${eventId}/price-history`, {
+      auth: "read",
+      query: { timePeriod: "12H" },
+    });
     return Object.fromEntries(
       (result.markets ?? []).map((market) => [
         market.marketId,

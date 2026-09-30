@@ -31,11 +31,18 @@ const BetsView = () => {
       <PageHeader title="Bets" subtitle={`${shown.length} ${mode} bets`} withMode />
 
       <div className="space-y-2">
-        <Chips current={status} onChange={setStatus} options={STATUS_GROUPS.map((value) => ({ value, label: STATUS_LABELS[value] }))} />
+        <Chips
+          current={status}
+          onChange={setStatus}
+          options={STATUS_GROUPS.map((value) => ({ value, label: STATUS_LABELS[value] }))}
+        />
         <Chips
           current={kind}
           onChange={setKind}
-          options={[{ value: "all", label: "All types" }, ...kinds.map((value) => ({ value, label: MARKET_KIND_LABELS[value] ?? value }))]}
+          options={[
+            { value: "all", label: "All types" },
+            ...kinds.map((value) => ({ value, label: MARKET_KIND_LABELS[value] ?? value })),
+          ]}
         />
       </div>
 
@@ -63,7 +70,10 @@ const BetsView = () => {
             {shown.map((bet) => (
               <tr key={bet.id} className="hover:bg-background">
                 <td className="max-w-md px-4 py-2.5">
-                  <Link href={`/bets/${bet.id}`} className="block truncate font-medium hover:underline">
+                  <Link
+                    href={`/bets/${bet.id}`}
+                    className="block truncate font-medium hover:underline"
+                  >
                     {bet.eventTitle}
                   </Link>
                   <p className="truncate text-xs text-muted">
@@ -71,12 +81,18 @@ const BetsView = () => {
                     {bet.outcomeLabel} · {lagosDateTime(bet.createdAt)}
                   </p>
                 </td>
-                <td className="px-4 py-2.5 text-muted">{MARKET_KIND_LABELS[kindOf(bet)] ?? kindOf(bet)}</td>
+                <td className="px-4 py-2.5 text-muted">
+                  {MARKET_KIND_LABELS[kindOf(bet)] ?? kindOf(bet)}
+                </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{money(bet.stake)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{pct(bet.quotedPrice)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{pct(bet.probability)}</td>
-                <td className={`px-4 py-2.5 capitalize ${STATUS_STYLE[bet.status] ?? ""}`}>{bet.status}</td>
-                <td className={`px-4 py-2.5 text-right tabular-nums ${STATUS_STYLE[bet.status] ?? ""}`}>
+                <td className={`px-4 py-2.5 capitalize ${STATUS_STYLE[bet.status] ?? ""}`}>
+                  {bet.status}
+                </td>
+                <td
+                  className={`px-4 py-2.5 text-right tabular-nums ${STATUS_STYLE[bet.status] ?? ""}`}
+                >
                   {bet.pnl === null ? "–" : signedMoney(bet.pnl)}
                 </td>
               </tr>

@@ -29,7 +29,9 @@ export const measurementTime = (event: MarketEvent): Date | null => {
   const weather = parseWeatherQuestion(event);
   if (weather) return weather.at;
 
-  const match = event.title.match(/\bby\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)(?:\s+(WAT|GMT|UTC|ET|EDT|EST))?\b/i);
+  const match = event.title.match(
+    /\bby\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)(?:\s+(WAT|GMT|UTC|ET|EDT|EST))?\b/i,
+  );
   const day = event.resolutionDate ?? event.closingDate;
   if (!match || !day) return null;
   const [, hour, minute, meridiem, zone] = match;
@@ -37,5 +39,13 @@ export const measurementTime = (event: MarketEvent): Date | null => {
   const offset = zoneOffset(zone, new Date(day));
   // the calendar day in that zone of the resolution date
   const local = new Date(Date.parse(day) + offset * 3_600_000);
-  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour24 - offset, Number(minute ?? 0)));
+  return new Date(
+    Date.UTC(
+      local.getUTCFullYear(),
+      local.getUTCMonth(),
+      local.getUTCDate(),
+      hour24 - offset,
+      Number(minute ?? 0),
+    ),
+  );
 };

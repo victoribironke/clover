@@ -18,7 +18,9 @@ const OPEN = new Set(["pending", "placing", "placed"]);
 // The last 24 hours in one message (Cloud Scheduler runs it at 23:30 WAT; /summary on demand).
 // Settles first so the day's results are complete, and always sends, even in quiet mode.
 export const buildDailySummary = async (exchange: Exchange) => {
-  await runHousekeeping(exchange).catch((error) => log.error("housekeeping failed", { error: errorMessage(error) }));
+  await runHousekeeping(exchange).catch((error) =>
+    log.error("housekeeping failed", { error: errorMessage(error) }),
+  );
 
   const since = new Date(Date.now() - DAY_MS);
   const sinceIso = since.toISOString();

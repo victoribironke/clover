@@ -13,15 +13,20 @@ export type Effort = "none" | "low" | "medium" | "high";
 
 // After retries: OpenAI is down or out of quota, so there's no point trying the next event
 export const isOpenAiUnavailable = (error: unknown) =>
-  error instanceof APIError && (error.status === undefined || [429, 500, 502, 503, 504].includes(error.status));
+  error instanceof APIError &&
+  (error.status === undefined || [429, 500, 502, 503, 504].includes(error.status));
 
-export const reason = async <T>(request: StructuredRequest<T> & { effort: Effort }): Promise<StructuredResult<T>> => {
+export const reason = async <T>(
+  request: StructuredRequest<T> & { effort: Effort },
+): Promise<StructuredResult<T>> => {
   const response = await client.responses.create({
     model: settings.reasoningModel,
     instructions: request.system,
     input: request.prompt,
     // strict: the reply always matches the schema (every property required, no extras)
-    text: { format: { type: "json_schema", name: "reply", schema: request.jsonSchema, strict: true } },
+    text: {
+      format: { type: "json_schema", name: "reply", schema: request.jsonSchema, strict: true },
+    },
     reasoning: { effort: request.effort },
     // includes reasoning tokens; only what's used is billed
     max_output_tokens: request.maxOutputTokens,

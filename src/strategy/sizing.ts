@@ -10,7 +10,11 @@ export const CONFIDENCE_WEIGHT: Record<Confidence, number> = {
   high: 0.7,
 };
 
-export const blendProbability = (modelProbability: number, marketPrice: number, confidence: Confidence) => {
+export const blendProbability = (
+  modelProbability: number,
+  marketPrice: number,
+  confidence: Confidence,
+) => {
   const weight = CONFIDENCE_WEIGHT[confidence];
   return weight * modelProbability + (1 - weight) * marketPrice;
 };
@@ -54,6 +58,7 @@ export const stakeFor = ({
   const stake = Math.floor(raw + 1e-9);
   if (stake >= minOrderAmount) return stake;
   // A real but small edge: round up to the market minimum if that's still a small bet
-  const minimumAllowed = minOrderAmount <= minimumStakeFraction * bankroll && minOrderAmount <= deployable;
+  const minimumAllowed =
+    minOrderAmount <= minimumStakeFraction * bankroll && minOrderAmount <= deployable;
   return kelly > 0 && minimumAllowed ? minOrderAmount : 0;
 };
