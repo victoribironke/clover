@@ -9,13 +9,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { lagosDate, lagosDateTime, money } from "@/lib/format";
+import { lagosDate, lagosDateTime } from "@/lib/format";
 import type { CurvePoint } from "@/lib/overview";
 
-type BankrollChartProps = { points: CurvePoint[]; capital: number };
+type BankrollChartProps = {
+  points: CurvePoint[];
+  capital: number;
+  // amounts in the exchange's currency
+  format: (amount: number) => string;
+};
 
 // Capital + realized P&L after each settled bet; the dashed line is the starting capital
-const BankrollChart = ({ points, capital }: BankrollChartProps) => {
+const BankrollChart = ({ points, capital, format }: BankrollChartProps) => {
   if (points.length < 2) {
     return (
       <p className="py-16 text-center text-sm text-muted">
@@ -34,7 +39,7 @@ const BankrollChart = ({ points, capital }: BankrollChartProps) => {
           minTickGap={32}
         />
         <YAxis
-          tickFormatter={money}
+          tickFormatter={format}
           tick={{ fontSize: 12 }}
           stroke="var(--muted)"
           width={84}
@@ -42,7 +47,7 @@ const BankrollChart = ({ points, capital }: BankrollChartProps) => {
         />
         <ReferenceLine y={capital} stroke="var(--muted)" strokeDasharray="4 4" />
         <Tooltip
-          formatter={(value) => money(Number(value))}
+          formatter={(value) => format(Number(value))}
           labelFormatter={(label) => lagosDateTime(String(label))}
           contentStyle={{
             background: "var(--card)",
