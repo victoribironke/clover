@@ -13,7 +13,7 @@ const event = (overrides: Partial<MarketEvent>): MarketEvent => ({
   description: "",
   additionalContext: "",
   resolutionSource: "",
-  category: "FINANCE",
+  category: "ECONOMY",
   type: "single",
   engine: "AMM",
   status: "open",
@@ -70,7 +70,7 @@ describe("eligibleEvents", () => {
     }
   });
   test("keeps data-driven categories", () => {
-    for (const category of ["CRYPTO", "FINANCE", "ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS", "SPORTS"]) {
+    for (const category of ["ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS", "SPORTS"]) {
       expect(passes({ category, resolutionDate: inHours(5) })).toBe(true);
     }
   });
@@ -82,6 +82,10 @@ describe("eligibleEvents", () => {
 describe("excluded kinds", () => {
   test("drops engagement markets even in allowed categories", () => {
     expect(passes({ category: "SOCIAL MEDIA", title: "How Many Likes Will Taylor Swift's Latest Post Get?", resolutionDate: inHours(5) })).toBe(false);
+  });
+  test("drops price markets (crypto, stocks)", () => {
+    expect(passes({ category: "CRYPTO", title: "Bitcoin Price above $83,375.57 by 4:00 PM GMT on Sep 29?", resolutionDate: inHours(5) })).toBe(false);
+    expect(passes({ category: "FINANCE", title: "Best Performing NGX Banking Stock This Week?", resolutionDate: inHours(5) })).toBe(false);
   });
   test("keeps post counts in the same category", () => {
     expect(passes({ category: "SOCIAL MEDIA", title: "Pop Base’s Number of X Posts Today, September 25, 2026?", resolutionDate: inHours(5) })).toBe(true);
