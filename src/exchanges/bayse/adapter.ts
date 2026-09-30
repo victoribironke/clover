@@ -299,6 +299,7 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
 
   return {
     name: "bayse",
+    canTrade: true,
     currency: CURRENCY,
     payoutPerShare: 100,
     listOpenEvents,
