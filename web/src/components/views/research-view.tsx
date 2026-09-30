@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Chips from "@/components/chips";
 import PageHeader from "@/components/page-header";
 import { usePanel } from "@/components/panel-provider";
-import { bayseEventUrl, lagosDateTime, pct, usd } from "@/lib/format";
+import { eventUrl, lagosDateTime, pct, usd } from "@/lib/format";
 import { MARKET_KIND_LABELS } from "@/lib/labels";
 
 type Verdict = "all" | "bet" | "passed";
@@ -46,6 +46,7 @@ const ResearchView = () => {
       <PageHeader
         title="Research log"
         subtitle={`${sorted.length} deep dives · ${usd(spent)} spent · ${pct(betRate, 0)} became bets`}
+        withVenue
       />
       <Chips current={verdict} onChange={setVerdict} options={VERDICTS} />
 
@@ -59,7 +60,7 @@ const ResearchView = () => {
           <li key={analysis.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <a
-                href={bayseEventUrl(analysis.eventId)}
+                href={eventUrl(analysis.exchange ?? "bayse", analysis.eventId)}
                 target="_blank"
                 rel="noreferrer"
                 className="font-medium hover:underline"
