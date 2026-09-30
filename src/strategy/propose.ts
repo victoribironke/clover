@@ -92,7 +92,7 @@ export const proposeBet = async (
     if (!market || market.status !== "open") continue;
 
     for (const [index, outcome] of market.outcomes.entries()) {
-      if (outcome.price < MIN_PRICE || outcome.price > MAX_PRICE) continue;
+      if (outcome.price < Math.max(MIN_PRICE, settings.minOutcomePrice) || outcome.price > MAX_PRICE) continue;
 
       const modelProbability = index === 0 ? estimate.probabilityOutcome1 : 1 - estimate.probabilityOutcome1;
       const probability = blendProbability(modelProbability, outcome.price, estimate.confidence);
