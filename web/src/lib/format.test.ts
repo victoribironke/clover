@@ -13,3 +13,9 @@ test("dates are shown in Lagos time (UTC+1)", () => {
   expect(lagosDate("2026-09-25T10:00:00Z")).toBe("25 Sep");
   expect(lagosTime("2026-09-25T13:05:00Z")).toBe("14:05");
 });
+
+test("money in dollars keeps cents", () => {
+  expect(money(12.5, "USD")).toBe("$12.50");
+  expect(money(-0.07, "USD")).toBe("-$0.07");
+  expect(signedMoney(1234.567, "USD")).toBe("+$1,234.57");
+});
