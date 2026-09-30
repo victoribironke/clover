@@ -8,7 +8,7 @@ import { settings } from "@/settings.ts";
 import { isTradeable, nowUtc } from "./describe-event.ts";
 
 const SYSTEM = `Pick prediction markets worth web research. Only pick markets that settle on a measurable number from a public data source: a price, exchange rate, temperature, post/stream count, chart position, or official statistic. Sports matches are fine too, but only results and goals: favor ones with bookmaker lines to compare against. Never shots, passes, corners or cards (bookmakers rarely price them). Never pick markets decided by a person's choice (awards, evictions, guests, retirements, elections), and never likes, views, reposts or follower counts (anyone can buy those with bots).
-Best targets, pick these first: weather readings (forecast models are strong a day or two out) and post counts by an account or person (posting habits are steady). Then chart positions, stream counts and price thresholds.
+Best targets, pick these first: weather readings (forecast models are strong a day or two out), then chart positions, stream counts and official statistics. Post counts last: they're only bet on when a live count so far can be found.
 Favor ones where current data, trends, or forecasts can beat the crowd, at mid-range prices. Skip pure noise: 15-minute, hourly and daily up/down moves are close to coin flips. Reply with refs only, best first. Picking none is fine.`;
 
 const schema = {
