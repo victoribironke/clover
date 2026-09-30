@@ -18,7 +18,7 @@ export type MarketKind =
 
 export type Bet = {
   id: string;
-  exchange: "bayse";
+  exchange: Venue;
   currency: "NGN" | "USD";
   eventId: string;
   marketId: string;
@@ -49,10 +49,16 @@ export type Bet = {
   updatedAt: string;
 };
 
+// The exchanges the bot trades on (src/exchanges/types.ts)
+export type Venue = "bayse" | "kalshi";
+
 // Published by the bot on every start (kv/settings); only the fields the panel uses
 export type BotSettings = {
+  // Bayse's, kept for older snapshots; per-exchange values are in `exchanges`
   dryRun: boolean;
   capitalNgn: number;
+  // added 2026-09-30, with Kalshi
+  exchanges?: Partial<Record<Venue, { dryRun: boolean; capital: number }>>;
   dailyResearchBudgetUsd: number;
   publishedAt?: string;
 };
@@ -79,7 +85,7 @@ export type NearMiss = {
 // Mirrors what src/db/analyses.ts saves: one deep dive and its verdict
 export type Analysis = {
   id: string;
-  exchange: "bayse";
+  exchange: Venue;
   eventId: string;
   eventTitle: string;
   category?: string;
