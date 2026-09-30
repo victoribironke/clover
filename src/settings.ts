@@ -2,21 +2,29 @@
 // the deploy workflow ships it. Secrets live in src/config.ts.
 
 export const settings = {
-  // --- Money ---
-  // false = paper trading: everything runs, but no real orders are sent.
-  // Flip to false only after paper results look good.
-  dryRun: true,
+  // --- Exchanges ---
+  // Each exchange has its own capital, in its own currency: the bot only ever works with that
+  // much, and anything above it is withdrawable profit. dryRun true = paper trading: everything
+  // runs, but no real orders are sent. Flip to false only after paper results look good.
+  exchanges: {
+    // NGN. Researched with AI (Gemini search + gpt-6-luna).
+    bayse: { enabled: true, dryRun: true, capital: 10_000, research: "ai" },
+    // USD, paper only for now: no account is connected, it reads Kalshi's public market data
+    // (from 2026-09-30). Daily US high/low temperature markets, priced from a weather-model
+    // ensemble plus the settlement station's own readings, with no AI calls
+    // (src/research/weather-model.ts).
+    kalshi: { enabled: true, dryRun: true, capital: 100, research: "weather-model" },
+  },
   // Muted: no per-bet Telegram messages. Problems are saved and everything is reported in one
   // daily summary (23:30 WAT). Your own /scan still answers. Set false to hear about every bet.
   quiet: false,
-  // the bot only ever works with this much; anything above it is withdrawable profit
-  capitalNgn: 10_000,
   // fraction of full Kelly to bet (0.25 = quarter Kelly)
   kellyFraction: 0.25,
   // hard cap on a single bet, as a fraction of capital
   maxBetFraction: 0.1,
-  // Small edges often size below a market's minimum order (₦100-₦500). Bet the minimum instead,
-  // if it's at most this fraction of the bankroll (0.05 = ₦500 of ₦10,000). 0 turns it off.
+  // Small edges often size below a market's minimum order (₦100-₦500 on Bayse, $1 on Kalshi).
+  // Bet the minimum instead, if it's at most this fraction of the bankroll (0.05 = ₦500 of
+  // ₦10,000). 0 turns it off.
   minimumStakeFraction: 0.05,
   // minimum expected return after fees and price impact (0.05 = +5%)
   minEdge: 0.02,
@@ -36,6 +44,7 @@ export const settings = {
   maxDeepDivesPerScan: 10,
   // don't re-research an event within this window; prices and data move, so re-check a few times a day
   researchCooldownHours: 8,
+  // Bayse categories (Kalshi only lists the series below, so it has no category filter).
   // Markets that settle on measurable public data (prices, rates, temperatures, counts, charts,
   // official statistics), plus sports matches (back in from 2026-09-26; bookmaker odds are the
   // evidence there). Categories are a first cut: screening then drops anything decided by a
@@ -60,8 +69,9 @@ export const settings = {
   // Kinds that are only bet on with a live reading. For sports that means current bookmaker odds
   // for the line: without them the model is guessing from averages (from 2026-09-28). Post counts
   // need the count so far: on posting history alone the bot overrated "X or more" and won 5 of
-  // 27 (-₦3,029, from 2026-09-30).
-  liveReadingRequiredKinds: ["sports", "post-count"],
+  // 27 (-₦3,029, from 2026-09-30). Weather: Bayse's always has one (the ensemble for its reading
+  // hour); on Kalshi it means the station's readings after the day's peak (src/research/weather-model.ts).
+  liveReadingRequiredKinds: ["sports", "post-count", "weather"],
   // Never buy an outcome priced below this: long shots like "0-0 draw" at 5% were ₦100 lottery
   // tickets let through by minimum-stake rounding (from 2026-09-30)
   minOutcomePrice: 0.1,
@@ -79,5 +89,66 @@ export const settings = {
   // late-price study: records settled markets (no Gemini); must stay under 11 hours (see src/jobs/study.ts)
   studyEveryMinutes: 360,
 
+  // Kalshi scans run every 2 hours (clover-scan-kalshi): no AI cost, and same-day station
+  // readings change the picture through the day
+  kalshiScanEveryMinutes: 120,
+
   bayseBaseUrl: "https://relay.bayse.markets",
+  kalshiBaseUrl: "https://external-api.kalshi.com/trade-api/v2",
+  // Kalshi's daily US temperature series (checked 2026-09-30: all have open events every day).
+  // Each settles on one NWS climate station, named in the rules as "(CLIxxx)".
+  kalshiSeries: [
+    // daily highs
+    "KXHIGHNY",
+    "KXHIGHCHI",
+    "KXHIGHMIA",
+    "KXHIGHLAX",
+    "KXHIGHDEN",
+    "KXHIGHAUS",
+    "KXHIGHPHIL",
+    "KXHIGHTATL",
+    "KXHIGHTBOS",
+    "KXHIGHTDAL",
+    "KXHIGHTDC",
+    "KXHIGHTEWR",
+    "KXHIGHTHOU",
+    "KXHIGHTLV",
+    "KXHIGHTMIN",
+    "KXHIGHTNOLA",
+    "KXHIGHTOKC",
+    "KXHIGHTPHX",
+    "KXHIGHTSAN",
+    "KXHIGHTSATX",
+    "KXHIGHTSDF",
+    "KXHIGHTSEA",
+    "KXHIGHTSFO",
+    "KXHIGHTTTN",
+    // daily lows
+    "KXLOWTNYC",
+    "KXLOWTCHI",
+    "KXLOWTMIA",
+    "KXLOWTLAX",
+    "KXLOWTDEN",
+    "KXLOWTAUS",
+    "KXLOWTPHIL",
+    "KXLOWTATL",
+    "KXLOWTBOS",
+    "KXLOWTDAL",
+    "KXLOWTDC",
+    "KXLOWTEWR",
+    "KXLOWTHOU",
+    "KXLOWTLV",
+    "KXLOWTMIN",
+    "KXLOWTNOLA",
+    "KXLOWTOKC",
+    "KXLOWTPHX",
+    "KXLOWTSAN",
+    "KXLOWTSATX",
+    "KXLOWTSDF",
+    "KXLOWTSEA",
+    "KXLOWTSFO",
+    "KXLOWTTTN",
+  ],
 } as const;
+
+export type ExchangeSettings = (typeof settings.exchanges)[keyof typeof settings.exchanges];
