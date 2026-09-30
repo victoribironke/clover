@@ -4,7 +4,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePanel } from "@/components/panel-provider";
 import { kindOf } from "@/lib/analytics";
-import { bayseEventUrl, lagosDateTime, money, pct, signedMoney, usd } from "@/lib/format";
+import {
+  eventUrl,
+  lagosDateTime,
+  money as formatMoney,
+  pct,
+  signedMoney as formatSigned,
+  usd,
+} from "@/lib/format";
 import { MARKET_KIND_LABELS, STATUS_STYLE } from "@/lib/labels";
 
 const Row = ({ label, value }: { label: string; value: ReactNode }) => (
@@ -15,8 +22,8 @@ const Row = ({ label, value }: { label: string; value: ReactNode }) => (
 );
 
 const BetView = ({ id }: { id: string }) => {
-  const { bets, analyses } = usePanel();
-  const bet = bets.find((item) => item.id === id);
+  const { allBets, allAnalyses } = usePanel();
+  const bet = allBets.find((item) => item.id === id);
 
   if (!bet) {
     return (
@@ -31,7 +38,12 @@ const BetView = ({ id }: { id: string }) => {
     );
   }
 
-  const analysis = bet.analysisId ? analyses.find((item) => item.id === bet.analysisId) : undefined;
+  const currency = bet.currency ?? "NGN";
+  const money = (amount: number) => formatMoney(amount, currency);
+  const signedMoney = (amount: number) => formatSigned(amount, currency);
+  const analysis = bet.analysisId
+    ? allAnalyses.find((item) => item.id === bet.analysisId)
+    : undefined;
 
   return (
     <div className="space-y-5">
@@ -41,7 +53,7 @@ const BetView = ({ id }: { id: string }) => {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">
           <a
-            href={bayseEventUrl(bet.eventId)}
+            href={eventUrl(bet.exchange ?? "bayse", bet.eventId)}
             target="_blank"
             rel="noreferrer"
             className="hover:underline"
