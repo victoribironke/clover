@@ -2,10 +2,18 @@
 //   bun run markets  - list what's open on Bayse and what passes the filters (no LLM calls, no money)
 //   bun run scan     - run one full scan (LLM research + proposals to Telegram)
 //   bun run tick     - place due bets and settle resolved ones
-import { exchange } from "@/exchanges/index.ts";
+import { getExchange, isExchangeName } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
 import { runTick } from "@/jobs/tick.ts";
+
+// optional second argument: the exchange (default bayse), e.g. `bun src/cli.ts markets kalshi`
+const exchangeName = process.argv[3] ?? "bayse";
+if (!isExchangeName(exchangeName)) {
+  console.error(`unknown exchange: ${exchangeName}`);
+  process.exit(1);
+}
+const exchange = getExchange(exchangeName);
 
 const commands: Record<string, () => Promise<unknown>> = {
   markets: async () => {
