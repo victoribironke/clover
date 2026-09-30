@@ -56,7 +56,7 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
     await clearButtons(bet.telegramMessageId);
     await notify(
       `✅ Recovered: ${label(bet)}\nThe bot was interrupted while placing this bet, but the order did reach Bayse.\n` +
-        `${money(bet.stake)} at ${pct(order.avgPrice || bet.quotedPrice)} · order <code>${escapeHtml(order.id)}</code>`,
+        `${money(bet.stake, bet.currency)} at ${pct(order.avgPrice || bet.quotedPrice)} · order <code>${escapeHtml(order.id)}</code>`,
       { level: "alert" },
     );
     return;
@@ -82,7 +82,7 @@ const recoverLive = async (exchange: Exchange, bet: Bet) => {
 export const recoverStuckBets = async (exchange: Exchange) => {
   const cutoff = Date.now() - STUCK_AFTER_MS;
   const stuck = (await listBets(["placing"], 100)).filter(
-    (bet) => Date.parse(bet.updatedAt) < cutoff,
+    (bet) => bet.exchange === exchange.name && Date.parse(bet.updatedAt) < cutoff,
   );
 
   for (const bet of stuck) {
