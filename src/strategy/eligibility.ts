@@ -9,8 +9,11 @@ const HOUR = 60 * MINUTE;
 export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now = Date.now()) =>
   events.filter((event) => {
     if (event.status !== "open" || exclude.has(event.id)) return false;
-    if (!event.supportedCurrencies.includes("NGN")) return false;
-    if (!(settings.categories as readonly string[]).includes(event.category)) return false;
+    // Bayse lists everything, in several currencies; Kalshi only lists the series we asked for
+    if (event.exchange === "bayse") {
+      if (!event.supportedCurrencies.includes("NGN")) return false;
+      if (!(settings.categories as readonly string[]).includes(event.category)) return false;
+    }
     if ((settings.excludedKinds as readonly string[]).includes(marketKind(event))) return false;
     if (!event.markets.some((market) => market.status === "open")) return false;
     // Many events carry only one of the two dates; either is a fair stand-in for the other.
