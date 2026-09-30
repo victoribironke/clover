@@ -83,17 +83,18 @@ export const registerHandlers = () => {
     await ctx.reply("🔎 Scanning. I'll message you with anything worth betting on.");
     // A scan takes minutes and the webhook must answer quickly, so it's not awaited here.
     // On Cloud Run it goes through our own /jobs/scan: CPU is only on during a request, and that
-    // request stays open for the whole scan. Each exchange scans separately and reports its own result.
+    // request stays open for the whole scan. One request runs every exchange side by side
+    // (?exchange=all), and each exchange reports its own result.
     const origin = selfOrigin();
-    for (const exchange of exchanges) {
-      if (config.onCloudRun && origin) {
-        void fetch(`${origin}/jobs/scan?manual=1&exchange=${exchange.name}`, {
-          method: "POST",
-          headers: { authorization: `Bearer ${config.APP_SECRET}` },
-        }).catch((error) =>
-          notify(failureMessage("Couldn't start the scan", error), { level: "always" }),
-        );
-      } else {
+    if (config.onCloudRun && origin) {
+      void fetch(`${origin}/jobs/scan?manual=1&exchange=all`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${config.APP_SECRET}` },
+      }).catch((error) =>
+        notify(failureMessage("Couldn't start the scan", error), { level: "always" }),
+      );
+    } else {
+      for (const exchange of exchanges) {
         void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
       }
     }
