@@ -4,6 +4,7 @@ import { recordAlert } from "@/db/alerts.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { bot } from "./bot.ts";
+import { splitMessage } from "./split.ts";
 
 export const betKeyboard = (betId: string) =>
   new InlineKeyboard().text("❌ Cancel", `cancel:${betId}`).text("✅ Place now", `now:${betId}`);
@@ -16,18 +17,22 @@ export type NotifyLevel = "info" | "alert" | "always";
 
 type NotifyOptions = { level?: NotifyLevel; keyboard?: InlineKeyboard };
 
+// Returns the first message's id (the one with the buttons)
 const send = async (html: string, keyboard?: InlineKeyboard) => {
-  try {
-    const message = await bot.api.sendMessage(config.TELEGRAM_CHAT_ID, html, {
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
-      reply_markup: keyboard,
-    });
-    return message.message_id;
-  } catch (error) {
-    log.error("telegram send failed", { error: errorMessage(error) });
-    return null;
+  let firstId: number | null = null;
+  for (const [index, part] of splitMessage(html).entries()) {
+    try {
+      const message = await bot.api.sendMessage(config.TELEGRAM_CHAT_ID, part, {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+        reply_markup: index === 0 ? keyboard : undefined,
+      });
+      firstId ??= message.message_id;
+    } catch (error) {
+      log.error("telegram send failed", { error: errorMessage(error), part: index });
+    }
   }
+  return firstId;
 };
 
 // Returns the Telegram message id when a message was actually sent
