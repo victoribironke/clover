@@ -1,6 +1,11 @@
 import type { Bet } from "@/db/bets.ts";
 import { eventUrl } from "@/exchanges/links.ts";
-import type { ExchangeName, Wallet } from "@/exchanges/types.ts";
+import {
+  EXCHANGE_LABELS,
+  type Currency,
+  type ExchangeName,
+  type Wallet,
+} from "@/exchanges/types.ts";
 import type { ScanReport } from "@/jobs/scan.ts";
 import { describeError } from "@/lib/errors.ts";
 import type { DeepDive } from "@/research/deep-dive.ts";
@@ -10,12 +15,22 @@ import type { Bankroll } from "@/strategy/bankroll.ts";
 export const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const naira = new Intl.NumberFormat("en-NG", {
-  style: "currency",
-  currency: "NGN",
-  maximumFractionDigits: 0,
-});
-export const money = (amount: number) => naira.format(amount);
+const FORMATS: Record<Currency, Intl.NumberFormat> = {
+  NGN: new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }),
+  USD: new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }),
+};
+// ₦1,234 on Bayse, $12.34 on Kalshi
+export const money = (amount: number, currency: Currency = "NGN") =>
+  FORMATS[currency].format(amount);
 
 export const usd = (amount: number) => `$${amount.toFixed(amount < 1 ? 3 : 2)}`;
 
@@ -59,10 +74,10 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
     bet.marketTitle !== bet.eventTitle ? `Market: ${escapeHtml(bet.marketTitle)}` : null,
     `Pick: <b>${escapeHtml(bet.outcomeLabel)}</b>`,
     "",
-    `Stake: <b>${money(bet.stake)}</b> at ${pct(bet.quotedPrice)} (market shows ${pct(bet.marketPrice)})`,
+    `Stake: <b>${money(bet.stake, bet.currency)}</b> at ${pct(bet.quotedPrice)} (market shows ${pct(bet.marketPrice)})`,
     `Our probability: <b>${pct(bet.probability)}</b> · confidence ${bet.confidence}`,
-    `Expected return: <b>${pct(bet.expectedReturn, true)}</b> (≈ ${money(bet.stake * bet.expectedReturn)})`,
-    `Pays ${money(bet.stake / bet.quotedPrice)} if it wins`,
+    `Expected return: <b>${pct(bet.expectedReturn, true)}</b> (≈ ${money(bet.stake * bet.expectedReturn, bet.currency)})`,
+    `Pays ${money(bet.stake / bet.quotedPrice, bet.currency)} if it wins`,
     "",
     `<b>Latest data</b>\n📏 ${escapeHtml(research.reading)}`,
     "",
@@ -70,7 +85,9 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
     factors ? `\n<b>Key factors</b>\n${factors}` : null,
     sources ? `\n<b>Sources</b>\n${sources}` : null,
     "",
-    `<i>Research cost ${usd(research.costUsd)} · ${research.usage.searches} searches</i>`,
+    research.costUsd > 0
+      ? `<i>Research cost ${usd(research.costUsd)} · ${research.usage.searches} searches</i>`
+      : `<i>Priced from data, no AI cost</i>`,
     `⏳ Places ${lagosTime(bet.executeAt)} WAT unless you cancel.`,
   ]
     .filter((line) => line !== null)
@@ -128,14 +145,29 @@ const reviewedLines = ({
   return lines.join("\n");
 };
 
+// Telegram messages stop at 4,096 characters, and a Kalshi scan checks ~100 events: list the
+// bets and the closest misses, and count the rest
+const MAX_REVIEWED = 8;
+
 export const scanReportMessage = (report: ScanReport) => {
-  if (report.skippedReason) return `⏸ <b>Scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
+  const name = EXCHANGE_LABELS[report.exchange];
+  if (report.skippedReason)
+    return `⏸ <b>${name} scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
   const lines = [
-    `🔎 <b>Scan done</b>`,
+    `🔎 <b>${name} scan done</b>`,
     `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>${report.placed ? ` · ${report.placed} placed` : ""}`,
   ];
-  if (report.reviewed.length > 0) lines.push("", "📋 <b>Researched</b>");
-  for (const item of report.reviewed) lines.push("", reviewedLines(item));
+  const ranked = [...report.reviewed].sort(
+    (a, b) =>
+      Number(b.proposed) - Number(a.proposed) ||
+      (b.nearMiss?.expectedReturn ?? -Infinity) - (a.nearMiss?.expectedReturn ?? -Infinity),
+  );
+  const shown = ranked.slice(0, MAX_REVIEWED);
+  if (shown.length > 0) lines.push("", "📋 <b>Researched</b>");
+  for (const item of shown) lines.push("", reviewedLines(item));
+  if (ranked.length > shown.length) {
+    lines.push("", `<i>…and ${ranked.length - shown.length} more with less edge</i>`);
+  }
   if (report.failed.length > 0) {
     lines.push("", `⚠️ <b>${report.failed.length} failed</b>`);
     for (const { title, error } of report.failed.slice(0, 5)) {
@@ -157,8 +189,8 @@ export const statusLine = (bet: Bet) => {
     skipped: "⏭️",
     failed: "⚠️",
   };
-  const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl)}` : "";
-  return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake)} · ${bet.status}${pnl}${tag(bet)}`;
+  const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl, bet.currency)}` : "";
+  return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake, bet.currency)} · ${bet.status}${pnl}${tag(bet)}`;
 };
 
 // 📊 Late-price study: are prices near the end fair, which kinds void, and does trading after
@@ -206,6 +238,8 @@ export type DailySummary = {
   spentUsd: number;
   deepDives: number;
   alerts: { at: string; text: string }[];
+  // research spend and problems are shared by all exchanges: shown in the first summary only
+  shared?: boolean;
 };
 
 const LIST_LIMIT = 8;
@@ -213,7 +247,8 @@ const more = (total: number) =>
   total > LIST_LIMIT ? [`<i>…and ${total - LIST_LIMIT} more</i>`] : [];
 const sum = (bets: Bet[], pick: (bet: Bet) => number) =>
   bets.reduce((total, bet) => total + pick(bet), 0);
-const signedMoney = (amount: number) => `${amount > 0 ? "+" : ""}${money(amount)}`;
+const signedMoney = (amount: number, currency: Currency) =>
+  `${amount > 0 ? "+" : ""}${money(amount, currency)}`;
 
 // 📒 The last 24 hours in one message, for quiet mode
 export const dailySummaryMessage = ({
@@ -225,46 +260,56 @@ export const dailySummaryMessage = ({
   spentUsd,
   deepDives,
   alerts,
+  shared = true,
 }: DailySummary) => {
   const won = settled.filter((bet) => bet.status === "won");
   const lost = settled.filter((bet) => bet.status === "lost");
   const voided = settled.filter((bet) => bet.status === "void");
   const dayPnl = sum(settled, (bet) => bet.pnl ?? 0);
+  const c = bankroll.currency;
   const icon = (bet: Bet) => (bet.status === "won" ? "🏆" : bet.status === "lost" ? "❌" : "↩️");
 
   const lines = [
-    `📒 <b>Daily summary</b> · last 24 hours${bankroll.dryRun ? " <i>(paper)</i>" : ""}`,
+    `📒 <b>${EXCHANGE_LABELS[bankroll.exchange]} daily summary</b> · last 24 hours${bankroll.dryRun ? " <i>(paper)</i>" : ""}`,
     "",
   ];
 
   lines.push(
-    `<b>Placed:</b> ${placed.length} bets · ${money(sum(placed, (bet) => bet.stake))} staked`,
+    `<b>Placed:</b> ${placed.length} bets · ${money(
+      sum(placed, (bet) => bet.stake),
+      c,
+    )} staked`,
   );
   for (const bet of placed.slice(0, LIST_LIMIT)) {
     lines.push(
-      `• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`,
+      `• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake, c)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`,
     );
   }
   lines.push(...more(placed.length), "");
 
   lines.push(
-    `<b>Settled:</b> ${won.length} won · ${lost.length} lost · ${voided.length} void · P&L <b>${signedMoney(dayPnl)}</b>`,
+    `<b>Settled:</b> ${won.length} won · ${lost.length} lost · ${voided.length} void · P&L <b>${signedMoney(dayPnl, c)}</b>`,
   );
   for (const bet of settled.slice(0, LIST_LIMIT)) {
     lines.push(
-      `${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0)}`,
+      `${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0, c)}`,
     );
   }
   lines.push(...more(settled.length), "");
 
   lines.push(
-    `<b>Open:</b> ${open.length} bets · ${money(sum(open, (bet) => bet.stake))} in play`,
-    `<b>Realized P&L:</b> ${signedMoney(bankroll.realizedPnl)} · withdrawable <b>${money(bankroll.withdrawable)}</b>`,
+    `<b>Open:</b> ${open.length} bets · ${money(
+      sum(open, (bet) => bet.stake),
+      c,
+    )} in play`,
+    `<b>Realized P&L:</b> ${signedMoney(bankroll.realizedPnl, c)} · withdrawable <b>${money(bankroll.withdrawable, c)}</b>`,
     wallet
-      ? `<b>Bayse wallet:</b> ${money(wallet.available)}`
-      : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
-    `<b>Research:</b> ${deepDives} deep dives · ${usd(spentUsd)} today`,
+      ? `<b>${EXCHANGE_LABELS[bankroll.exchange]} wallet:</b> ${money(wallet.available, c)}`
+      : bankroll.exchange === "kalshi"
+        ? "<b>Kalshi wallet:</b> <i>no account connected (paper only)</i>"
+        : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
   );
+  if (shared) lines.push(`<b>Research:</b> ${deepDives} AI deep dives · ${usd(spentUsd)} today`);
 
   if (alerts.length > 0) {
     lines.push("", `⚠️ <b>${alerts.length} problem${alerts.length === 1 ? "" : "s"}</b>`);
@@ -276,21 +321,28 @@ export const dailySummaryMessage = ({
 
 export type Spend = { today: number; month: number; dailyBudget: number };
 
-// The real Bayse wallet, next to the bot's own numbers. Capital is a ceiling, not the balance:
+// The real exchange wallet, next to the bot's own numbers. Capital is a ceiling, not the balance:
 // the bot never works with more than capital, whatever the wallet holds.
 const walletLines = (wallet: Wallet | null, bankroll: Bankroll) => {
-  if (!wallet) return ["Bayse wallet: <i>couldn't read it right now</i>"];
-  const pending = wallet.pending > 0 ? ` (+${money(wallet.pending)} pending)` : "";
-  const lines = [`Bayse wallet: <b>${money(wallet.available)}</b>${pending}`];
+  const name = EXCHANGE_LABELS[bankroll.exchange];
+  if (!wallet)
+    return [
+      bankroll.exchange === "kalshi"
+        ? "Kalshi wallet: <i>no account connected (paper only)</i>"
+        : `${name} wallet: <i>couldn't read it right now</i>`,
+    ];
+  const pending =
+    wallet.pending > 0 ? ` (+${money(wallet.pending, bankroll.currency)} pending)` : "";
+  const lines = [`${name} wallet: <b>${money(wallet.available, bankroll.currency)}</b>${pending}`];
   if (bankroll.dryRun) {
     lines.push("<i>Real money, untouched while paper trading.</i>");
   } else if (wallet.available + bankroll.exposure < bankroll.capital) {
     lines.push(
-      `⚠️ Wallet plus money in play is below the ${money(bankroll.capital)} capital: the bot works with what's there.`,
+      `⚠️ Wallet plus money in play is below the ${money(bankroll.capital, bankroll.currency)} capital: the bot works with what's there.`,
     );
   } else {
     lines.push(
-      `${money(Math.max(0, wallet.available + bankroll.exposure - bankroll.capital))} of it sits outside the bot's capital.`,
+      `${money(Math.max(0, wallet.available + bankroll.exposure - bankroll.capital), bankroll.currency)} of it sits outside the bot's capital.`,
     );
   }
   return lines;
@@ -303,13 +355,13 @@ export const bankrollMessage = (
   wallet: Wallet | null,
 ) =>
   [
-    `<b>Clover</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
-    `Capital (ceiling): ${money(bankroll.capital)}`,
-    `Working bankroll: ${money(bankroll.bankroll)}`,
-    `In play: ${money(bankroll.exposure)}`,
-    `Free to bet: ${money(bankroll.deployable)}`,
-    `Realized P&L: ${money(bankroll.realizedPnl)}`,
-    `Withdrawable profit: <b>${money(bankroll.withdrawable)}</b>`,
+    `<b>${EXCHANGE_LABELS[bankroll.exchange]}</b> ${bankroll.dryRun ? "📝 paper trading" : "💸 live"}${paused ? " · ⏸ paused" : ""}`,
+    `Capital (ceiling): ${money(bankroll.capital, bankroll.currency)}`,
+    `Working bankroll: ${money(bankroll.bankroll, bankroll.currency)}`,
+    `In play: ${money(bankroll.exposure, bankroll.currency)}`,
+    `Free to bet: ${money(bankroll.deployable, bankroll.currency)}`,
+    `Realized P&L: ${money(bankroll.realizedPnl, bankroll.currency)}`,
+    `Withdrawable profit: <b>${money(bankroll.withdrawable, bankroll.currency)}</b>`,
     "",
     ...walletLines(wallet, bankroll),
     "",
