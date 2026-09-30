@@ -2,10 +2,13 @@
 
 A betting assistant for prediction markets. It scans [Bayse Markets](https://docs.bayse.markets/) for open markets and researches the promising ones: Gemini 3.8 Flash searches the web with Google Search and writes a fact brief, and OpenAI's gpt-6-luna makes the call from it. When it finds an edge, it sends you the bet on Telegram. You have a window to cancel before it places the bet.
 
+It also paper-trades [Kalshi](https://kalshi.com) (USD): its 48 daily US high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) below).
+
 ## How it works
 
 ```
-every 4h   scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
+every 4h   Bayse scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
+every 2h   Kalshi scan ─► settle ─► today's temperature markets ─► station readings + weather ensemble (no AI)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -23,9 +26,20 @@ every 4h   scan ─► settle ─► filter ─► screen (1 luna call) ─► d
 - **Live data first.** Before research, the bot fetches hard data itself where it can: a 122-run weather-model ensemble for temperature markets, and public mirrors of the Spotify and Apple Music Nigeria charts. The research must report the current reading it based its estimate on, which is shown on every bet. Without a live reading, confidence is capped at low, so history alone rarely triggers a bet. Sports and post counts need one to be bet on at all (bookmaker odds for the line, or the count so far).
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
-- **Capital.** The bot only ever works with ₦10,000. Anything above that is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
+- **Capital.** Each exchange has its own capital (`exchanges` in `src/settings.ts`): ₦10,000 on Bayse, $100 (paper) on Kalshi. The bot never works with more; anything above is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
 - **Research cost.** Every model call (Gemini and OpenAI) is priced from its token and search counts. Scans stop for the day at the daily budget. `/status` and every bet message show the spend.
 - **Before placing,** it re-checks that the market is still open and re-quotes. If the edge is gone, it skips the bet and tells you.
+
+## Kalshi (paper)
+
+Kalshi's market data is public, so this needs no account and no key. `canTrade` is false in the adapter ([`src/exchanges/kalshi/adapter.ts`](src/exchanges/kalshi/adapter.ts)): every Kalshi bet is paper.
+
+- **Markets.** The daily high and low temperature series for 24 US cities (`kalshiSeries` in `src/settings.ts`). Each settles on one NWS station's reading for the day, midnight to midnight local standard time, in whole °F.
+- **Pricing, no AI.** [`src/research/weather-model.ts`](src/research/weather-model.ts) takes the station's readings so far ([api.weather.gov](https://api.weather.gov)) and a ~120-run weather ensemble (ICON, GFS, ECMWF via [Open-Meteo](https://open-meteo.com)) for the rest of the day. Each run gives one possible final high or low. The share of runs in a band is its probability, with a degree of slack either side because public readings miss the official number by 1°F about a fifth of the time (checked on 192 settled days).
+- **Bets only late in the day.** Forecasts alone don't beat these markets: on the first check they sat 2°F from the price in several cities, which is a whole band. So Kalshi bets need the station's readings after 4 PM local standard time, when the day's high has usually been set. Earlier in the day events are priced and reported, not bet on.
+- **Quotes** walk Kalshi's live order book, whole contracts only, with Kalshi's fee included.
+
+If the paper results hold up, the plan is to fund Kalshi and Polymarket with about $5 each and drop Bayse.
 
 ## Settings vs secrets
 
@@ -70,7 +84,8 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 4. registers the Telegram webhook
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
-   - scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
+   - Bayse scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
+   - Kalshi scan every 2 hours at :15 (`/jobs/scan?exchange=kalshi`)
    - late-price study every 6 hours (no model calls, no money)
 
 Send `/status` to your bot to check it's alive.
@@ -84,9 +99,9 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
   ```bash
   curl -X POST -d '' -H "Authorization: Bearer $APP_SECRET" https://clover-uhkg4fo2na-od.a.run.app/jobs/tick
   ```
-  Use `/jobs/scan` in place of `/jobs/tick` to run a scan. Sending `/scan` in Telegram does the same thing.
+  Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, or `/jobs/scan?exchange=kalshi` for Kalshi. Sending `/scan` in Telegram runs both.
 - **Logs:** Cloud Run → `clover` → _Logs_. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
-- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-tick` and `clover-scan`. _Force run_ triggers one immediately.
+- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-kalshi`, `clover-summary` and `clover-study`. _Force run_ triggers one immediately.
 
 ## Running locally
 
@@ -98,21 +113,21 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
    gcloud config set project fl-clover
    ```
    Local runs use `dev_*` collections, so they never touch production data.
-4. `bun run markets` lists open markets and what passes the filters. It makes no model calls and moves no money.
+4. `bun run markets` lists open Bayse markets and what passes the filters; `bun src/cli.ts markets kalshi` does the same for Kalshi. Neither makes model calls or moves money.
 5. `bun run dev` starts the bot with long polling and in-process timers.
 
 Running locally with the production bot token switches Telegram from the webhook to polling. The next deploy switches it back. To avoid that, create a second bot for local testing.
 
 ### Telegram commands
 
-| Command              | What it does                                                                                              |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| `/status`            | Capital, money in play, realized P&L, withdrawable profit, your real Bayse wallet balance, research spend |
-| `/summary`           | The last 24 hours: bets placed, results, open bets, research spend, problems                              |
-| `/bets`              | Pending and open bets                                                                                     |
-| `/scan`              | Run a scan now                                                                                            |
-| `/study`             | Late-price study: are prices fair near the end, void rates by market type                                 |
-| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                                    |
+| Command              | What it does                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| `/status`            | Per exchange: capital, money in play, realized P&L, withdrawable profit, wallet, research spend |
+| `/summary`           | The last 24 hours per exchange: bets placed, results, open bets, research spend, problems       |
+| `/bets`              | Pending and open bets                                                                           |
+| `/scan`              | Run a scan now, on every exchange                                                               |
+| `/study`             | Late-price study: are prices fair near the end, void rates by market type                       |
+| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                          |
 
 ## Web panel
 
@@ -124,9 +139,10 @@ A read-only admin panel (results, bankroll curve, bets) lives in [`web/`](web/RE
 src/
   settings.ts       all tunable values
   config.ts         secrets (env) + local/Cloud Run detection
-  exchanges/        Exchange interface + Bayse adapter (HMAC signing, quotes, orders)
+  exchanges/        Exchange interface; Bayse adapter (HMAC signing, quotes, orders); Kalshi adapter (public data, paper)
   llm/              Gemini (search) and OpenAI (reasoning) clients, pricing
-  research/         screening + deep dive prompts and schemas
+  research/         screening + deep dive prompts and schemas; weather-model.ts prices Kalshi without AI
+  data/             hard data fetched before research: weather ensembles, charts, NWS station readings
   strategy/         probability blending, Kelly sizing, bankroll rules, bet proposal
   jobs/             scan, execute, settle, tick
   telegram/         bot, commands, message formatting
