@@ -54,11 +54,17 @@ export const settings = {
   // Market kinds (src/data/kind.ts) never researched or bet on. Likes/views/reposts/followers can
   // be pushed by anyone who buys bots, and Bayse voids them more often for manipulation. Match
   // stats (shots, passes, corners) have no bookmaker lines to check against, so bets on them
-  // were guesses (from 2026-09-28).
-  excludedKinds: ["engagement", "match-stats"],
+  // were guesses (from 2026-09-28). Prices (crypto/stock up-or-down, thresholds, "best performing
+  // stock") are close to coin flips with no data edge: 0 of 2 settled, -₦1,551 (from 2026-09-30).
+  excludedKinds: ["engagement", "match-stats", "price"],
   // Kinds that are only bet on with a live reading. For sports that means current bookmaker odds
-  // for the line: without them the model is guessing from averages (from 2026-09-28).
-  liveReadingRequiredKinds: ["sports"],
+  // for the line: without them the model is guessing from averages (from 2026-09-28). Post counts
+  // need the count so far: on posting history alone the bot overrated "X or more" and won 5 of
+  // 27 (-₦3,029, from 2026-09-30).
+  liveReadingRequiredKinds: ["sports", "post-count"],
+  // Never buy an outcome priced below this: long shots like "0-0 draw" at 5% were ₦100 lottery
+  // tickets let through by minimum-stake rounding (from 2026-09-30)
+  minOutcomePrice: 0.1,
   // only consider events that resolve within this many hours (7 days), so capital isn't tied up for long
   maxHoursToResolve: 168,
   // trading must stay open at least this long: the cancel window plus a margin to place the bet
