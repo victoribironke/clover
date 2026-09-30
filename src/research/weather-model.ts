@@ -3,6 +3,7 @@ import {
   climateDay,
   ensembleHours,
   extremeBias,
+  observedExtreme,
   finalValues,
   parseTemperatureQuestion,
   runsBetween,
@@ -25,6 +26,10 @@ const quantile = (sorted: number[], q: number) =>
 
 const localTime = (at: number, timeZone: string) =>
   new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(at);
+
+// "68°F", or "67.1-68.9°F" when only whole-°C readings say where it is
+const range = ({ min, max }: { min: number; max: number }) =>
+  max - min < 0.3 ? `${max.toFixed(1)}°F` : `${min.toFixed(1)}-${max.toFixed(1)}°F`;
 
 const signed = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 
@@ -57,8 +62,7 @@ export const weatherModel = async (
 
   // today's readings so far; without them the models cover the whole day
   const today = readings.filter((reading) => reading.at >= start);
-  const pick = question.kind === "high" ? Math.max : Math.min;
-  const observed = today.length > 0 ? pick(...today.map((reading) => reading.f)) : null;
+  const observed = observedExtreme(question.kind, today, start);
   const from = today.length > 0 ? Math.max(start, now) : start;
   const runs = runsBetween(ensemble, from, end).map((run) => run.map((value) => value + bias));
 
@@ -92,7 +96,7 @@ export const weatherModel = async (
   const spread = `${quantile(values, 0.1)}-${quantile(values, 0.9)}°F`;
   const soFar =
     observed !== null && latest
-      ? `${station.name}: ${word} so far ${observed}°F, latest ${latest.f}°F at ${localTime(latest.at, station.timeZone)}`
+      ? `${station.name}: ${word} so far ${range(observed)}, latest ${latest.f}°F at ${localTime(latest.at, station.timeZone)}`
       : null;
   const forecast = `${runs.length} ensemble runs (ICON, GFS, ECMWF): final ${word} median ${median}°F, 10-90% range ${spread}`;
   const correction =
