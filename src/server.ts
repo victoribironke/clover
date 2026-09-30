@@ -45,17 +45,23 @@ export const startServer = () =>
         },
       },
       "/jobs/scan": {
-        // ?exchange=kalshi picks the exchange (default Bayse, which the original scheduler job calls).
+        // ?exchange=kalshi picks the exchange (default Bayse, which the original scheduler job calls);
+        // ?exchange=all scans every enabled exchange side by side, in this one request.
         // ?manual=1 is a /scan from Telegram: run even when paused, and always report back.
         POST: (request) => {
           if (!authorizedCron(request)) return new Response("unauthorized", { status: 401 });
           const params = new URL(request.url).searchParams;
           const manual = params.get("manual") === "1";
           const name = params.get("exchange") ?? bayse.name;
+          const options = { force: manual, announce: manual };
+          if (name === "all") {
+            // each scan reports (or reports its failure) itself; one failing doesn't stop the other
+            return runJob("scan all", () =>
+              Promise.allSettled(exchanges.map((exchange) => runScanAndReport(exchange, options))),
+            );
+          }
           if (!isExchangeName(name)) return new Response("unknown exchange", { status: 400 });
-          return runJob(`scan ${name}`, () =>
-            runScanAndReport(getExchange(name), { force: manual, announce: manual }),
-          );
+          return runJob(`scan ${name}`, () => runScanAndReport(getExchange(name), options));
         },
       },
       "/jobs/study": {
