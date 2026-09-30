@@ -3,12 +3,19 @@ import { recentlyAnalyzedEventIds, saveAnalysis } from "@/db/analyses.ts";
 import { activeBetEventIds, createBet, updateBet } from "@/db/bets.ts";
 import { isPaused, releaseLock, tryLock } from "@/db/kv.ts";
 import { spendToday } from "@/db/spend.ts";
-import type { Exchange, ExchangeName } from "@/exchanges/types.ts";
+import { isDryRun } from "@/exchanges/mode.ts";
+import {
+  EXCHANGE_LABELS,
+  type Exchange,
+  type ExchangeName,
+  type MarketEvent,
+} from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { isGeminiUnavailable } from "@/llm/gemini.ts";
 import { isOpenAiUnavailable } from "@/llm/openai.ts";
-import { deepDive } from "@/research/deep-dive.ts";
+import { deepDive, type DeepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
+import { weatherModel } from "@/research/weather-model.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
@@ -31,6 +38,7 @@ const SCAN_DEADLINE = 15 * MINUTE;
 const SCAN_LOCK_TTL = 30 * MINUTE;
 
 export type ScanReport = {
+  exchange: ExchangeName;
   open: number;
   eligible: number;
   researched: number;
@@ -52,7 +60,8 @@ export type ScanReport = {
   skippedReason?: string;
 };
 
-const skipped = (skippedReason: string): ScanReport => ({
+const skipped = (exchange: ExchangeName, skippedReason: string): ScanReport => ({
+  exchange,
   open: 0,
   eligible: 0,
   researched: 0,
@@ -63,26 +72,67 @@ const skipped = (skippedReason: string): ScanReport => ({
   skippedReason,
 });
 
-// The research half of a scan: pick events, deep-dive them, propose bets. Early exits (no free
+// How an exchange's events are researched (settings.exchanges[name].research):
+// "ai" = screen with gpt-6-luna, then a Gemini + luna deep dive per event (costs money, capped);
+// "weather-model" = price every event from data (free, so all of them, every scan)
+type Researcher = {
+  pick: (eligible: MarketEvent[]) => Promise<string[]>;
+  research: (event: MarketEvent) => Promise<DeepDive>;
+  // AI research is budgeted and re-checked at most every researchCooldownHours
+  paid: boolean;
+};
+
+const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
+  ai: {
+    pick: (eligible) => triageEvents(eligible, settings.maxDeepDivesPerScan),
+    research: deepDive,
+    paid: true,
+  },
+  "weather-model": {
+    // Only today's markets (closing within a day): bets wait for the station's readings after the
+    // day's peak, so tomorrow's can't be bet on yet. Soonest first.
+    pick: async (eligible) =>
+      eligible
+        .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 24 * HOUR)
+        .sort((a, b) => (a.closingDate ?? "").localeCompare(b.closingDate ?? ""))
+        .map((event) => event.id),
+    research: async (event) => {
+      const research = await weatherModel(event);
+      if (!research) throw new Error("Not a temperature market the weather model can read");
+      return research;
+    },
+    paid: false,
+  },
+};
+
+// The research half of a scan: pick events, research them, propose bets. Early exits (no free
 // capital, budget spent) only skip research; the scan still does its bookkeeping and placing.
 const researchAndPropose = async (exchange: Exchange, startedAt: number): Promise<ScanReport> => {
+  const researcher = RESEARCHERS[settings.exchanges[exchange.name].research];
   const bankroll = await getBankroll(exchange);
   if (bankroll.deployable <= 0) {
-    return skipped("no free capital");
+    return skipped(exchange.name, "no free capital");
   }
-  if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
-    return skipped("daily research budget reached");
+  if (researcher.paid && (await spendToday()) >= settings.dailyResearchBudgetUsd) {
+    return skipped(exchange.name, "daily research budget reached");
   }
 
   const cooldownSince = new Date(Date.now() - settings.researchCooldownHours * HOUR).toISOString();
   const [events, recent, active] = await Promise.all([
     exchange.listOpenEvents(),
-    recentlyAnalyzedEventIds(exchange.name, cooldownSince),
+    researcher.paid
+      ? recentlyAnalyzedEventIds(exchange.name, cooldownSince)
+      : Promise.resolve(new Set<string>()),
     activeBetEventIds(exchange.name),
   ]);
   const eligible = eligibleEvents(events, new Set([...recent, ...active]));
-  const picked = await triageEvents(eligible, settings.maxDeepDivesPerScan);
-  log.info("scan", { open: events.length, eligible: eligible.length, picked: picked.length });
+  const picked = await researcher.pick(eligible);
+  log.info("scan", {
+    exchange: exchange.name,
+    open: events.length,
+    eligible: eligible.length,
+    picked: picked.length,
+  });
 
   let researched = 0;
   const failed: ScanReport["failed"] = [];
@@ -93,7 +143,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       log.warn("scan deadline reached", { researched });
       break;
     }
-    if ((await spendToday()) >= settings.dailyResearchBudgetUsd) {
+    if (researcher.paid && (await spendToday()) >= settings.dailyResearchBudgetUsd) {
       log.warn("daily research budget reached", { budget: settings.dailyResearchBudgetUsd });
       break;
     }
@@ -101,7 +151,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
     if ((await getBankroll(exchange)).deployable <= 0) break;
     const event = eligible.find((item) => item.id === eventId)!;
     try {
-      const research = await deepDive(event);
+      const research = await researcher.research(event);
       researched++;
       const current = await getBankroll(exchange);
 
@@ -114,16 +164,19 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
         current,
         research.liveData,
       );
-      const analysisId = await saveAnalysis(
-        exchange.name,
-        event,
-        `${settings.reasoningModel} + ${settings.searchModel}`,
-        research,
-        {
-          proposed: Boolean(proposal),
-          nearMiss,
-        },
-      );
+      // free research checks every event on every scan: only keep the ones that led to a bet
+      const analysisId =
+        researcher.paid || proposal
+          ? await saveAnalysis(
+              exchange.name,
+              event,
+              researcher.paid
+                ? `${settings.reasoningModel} + ${settings.searchModel}`
+                : "weather model",
+              research,
+              { proposed: Boolean(proposal), nearMiss },
+            )
+          : null;
       reviewed.push({
         exchange: exchange.name,
         eventId: event.id,
@@ -157,7 +210,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
         confidence: proposal.confidence,
         stake: proposal.stake,
         rationale: research.summary,
-        dryRun: settings.dryRun,
+        dryRun: isDryRun(exchange),
         executeAt: new Date(Date.now() + settings.cancelWindowMinutes * 60_000).toISOString(),
       });
       const messageId = await notify(proposalMessage(bet, research), {
@@ -174,6 +227,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
   }
 
   return {
+    exchange: exchange.name,
     open: events.length,
     eligible: eligible.length,
     researched,
@@ -185,10 +239,12 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
 };
 
 export const runScan = async (exchange: Exchange, { force = false } = {}): Promise<ScanReport> => {
-  if (!force && (await isPaused())) return skipped("paused");
-  const lock = await tryLock("scan", SCAN_LOCK_TTL);
+  if (!force && (await isPaused())) return skipped(exchange.name, "paused");
+  // one lock per exchange: Bayse and Kalshi scans may run side by side
+  const lock = await tryLock(`scan-${exchange.name}`, SCAN_LOCK_TTL);
   if (!lock.acquired) {
     return skipped(
+      exchange.name,
       `a scan is already running (started ${lagosTime(new Date(lock.startedAt).toISOString())}, lock clears ${lagosTime(new Date(lock.until).toISOString())} WAT)`,
     );
   }
@@ -204,7 +260,7 @@ export const runScan = async (exchange: Exchange, { force = false } = {}): Promi
     const placed = await runExecute(exchange);
     return { ...report, placed };
   } finally {
-    await releaseLock("scan");
+    await releaseLock(`scan-${exchange.name}`);
   }
 };
 
@@ -221,7 +277,9 @@ export const runScanAndReport = async (
       await notify(scanReportMessage(report), { level: announce ? "always" : "alert" });
     return report;
   } catch (error) {
-    await notify(failureMessage("Scan failed", error), { level: announce ? "always" : "alert" });
+    await notify(failureMessage(`${EXCHANGE_LABELS[exchange.name]} scan failed`, error), {
+      level: announce ? "always" : "alert",
+    });
     throw error;
   }
 };
