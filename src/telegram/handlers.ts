@@ -2,7 +2,7 @@ import { config } from "@/config.ts";
 import { getBet, listBets, updateBet } from "@/db/bets.ts";
 import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
-import { exchange } from "@/exchanges/index.ts";
+import { exchanges, getExchange } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
@@ -16,45 +16,49 @@ import { bot } from "./bot.ts";
 import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./format.ts";
 import { notify } from "./notify.ts";
 
-const HELP = `<b>Clover</b> scans Bayse for open markets, researches them, and bets where it finds an edge.
+const HELP = `<b>Clover</b> scans Bayse and Kalshi (paper) for open markets, researches them, and bets where it finds an edge.
 ${
   settings.quiet
     ? "🔕 Muted: bets are placed without messages, and a summary arrives daily at 23:30."
     : `Every bet is announced first. You have ${settings.cancelWindowMinutes} minutes to cancel it before it's placed.`
 }
 
-/status: bankroll and profit
+/status: bankroll and profit, per exchange
 /summary: the last 24 hours (also sent daily at 23:30)
 /bets: pending and open bets
-/scan: run a scan now
-/study: how prices behave near the end, and void rates by type
+/scan: run a scan now, on every exchange
+/study: how Bayse prices behave near the end, and void rates by type
 /pause: stop scanning and placing
 /resume: start again`;
 
 export const registerHandlers = () => {
   bot.command(["start", "help"], (ctx) => ctx.reply(HELP, { parse_mode: "HTML" }));
 
+  // one message per exchange, each in its own currency
   bot.command("status", async (ctx) => {
-    const [bankroll, paused, today, month, wallet] = await Promise.all([
-      getBankroll(exchange),
-      isPaused(),
-      spendToday(),
-      spendThisMonth(),
-      // read live; a Bayse hiccup shouldn't stop /status from answering
-      exchange.getWallet().catch(() => null),
-    ]);
+    const [paused, today, month] = await Promise.all([isPaused(), spendToday(), spendThisMonth()]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
-    await ctx.reply(bankrollMessage(bankroll, paused, spend, wallet), { parse_mode: "HTML" });
+    for (const exchange of exchanges) {
+      const [bankroll, wallet] = await Promise.all([
+        getBankroll(exchange),
+        // read live; an exchange hiccup shouldn't stop /status from answering
+        exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
+      ]);
+      await ctx.reply(bankrollMessage(bankroll, paused, spend, wallet), { parse_mode: "HTML" });
+    }
   });
 
   bot.command("summary", async (ctx) => {
-    await ctx.reply(await buildDailySummary(exchange), {
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
-    });
+    for (const [index, exchange] of exchanges.entries()) {
+      await ctx.reply(await buildDailySummary(exchange, { shared: index === 0 }), {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      });
+    }
   });
 
   bot.command("study", async (ctx) => {
+    // the late-price study only covers Bayse
     await ctx.reply(studyMessage(summarize(await loadStudies())), { parse_mode: "HTML" });
   });
 
@@ -79,17 +83,19 @@ export const registerHandlers = () => {
     await ctx.reply("🔎 Scanning. I'll message you with anything worth betting on.");
     // A scan takes minutes and the webhook must answer quickly, so it's not awaited here.
     // On Cloud Run it goes through our own /jobs/scan: CPU is only on during a request, and that
-    // request stays open for the whole scan. Either way the scan reports its own result.
+    // request stays open for the whole scan. Each exchange scans separately and reports its own result.
     const origin = selfOrigin();
-    if (config.onCloudRun && origin) {
-      void fetch(`${origin}/jobs/scan?manual=1`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${config.APP_SECRET}` },
-      }).catch((error) =>
-        notify(failureMessage("Couldn't start the scan", error), { level: "always" }),
-      );
-    } else {
-      void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
+    for (const exchange of exchanges) {
+      if (config.onCloudRun && origin) {
+        void fetch(`${origin}/jobs/scan?manual=1&exchange=${exchange.name}`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${config.APP_SECRET}` },
+        }).catch((error) =>
+          notify(failureMessage("Couldn't start the scan", error), { level: "always" }),
+        );
+      } else {
+        void runScanAndReport(exchange, { force: true, announce: true }).catch(() => {});
+      }
     }
   });
 
@@ -112,7 +118,7 @@ export const registerHandlers = () => {
       return;
     }
     await ctx.answerCallbackQuery("Placing…");
-    await executeBet(exchange, bet);
+    await executeBet(getExchange(bet.exchange), bet);
   });
 
   bot.catch((error) => log.error("telegram handler failed", { error: errorMessage(error.error) }));
