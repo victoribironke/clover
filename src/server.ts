@@ -1,6 +1,6 @@
 import { webhookCallback } from "grammy";
 import { config } from "@/config.ts";
-import { exchange } from "@/exchanges/index.ts";
+import { bayse, exchanges, getExchange, isExchangeName } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runDailySummary } from "@/jobs/summary.ts";
@@ -45,31 +45,39 @@ export const startServer = () =>
         },
       },
       "/jobs/scan": {
-        // ?manual=1 is a /scan from Telegram: run even when paused, and always report back
+        // ?exchange=kalshi picks the exchange (default Bayse, which the original scheduler job calls).
+        // ?manual=1 is a /scan from Telegram: run even when paused, and always report back.
         POST: (request) => {
           if (!authorizedCron(request)) return new Response("unauthorized", { status: 401 });
-          const manual = new URL(request.url).searchParams.get("manual") === "1";
-          return runJob("scan", () =>
-            runScanAndReport(exchange, { force: manual, announce: manual }),
+          const params = new URL(request.url).searchParams;
+          const manual = params.get("manual") === "1";
+          const name = params.get("exchange") ?? bayse.name;
+          if (!isExchangeName(name)) return new Response("unknown exchange", { status: 400 });
+          return runJob(`scan ${name}`, () =>
+            runScanAndReport(getExchange(name), { force: manual, announce: manual }),
           );
         },
       },
       "/jobs/study": {
         POST: (request) =>
           authorizedCron(request)
-            ? runJob("study", () => runStudy(exchange))
+            ? runJob("study", () => runStudy(bayse))
             : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/summary": {
         POST: (request) =>
           authorizedCron(request)
-            ? runJob("summary", () => runDailySummary(exchange))
+            ? runJob("summary", () => runDailySummary(exchanges))
             : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/tick": {
         POST: (request) =>
           authorizedCron(request)
-            ? runJob("tick", () => runTick(exchange))
+            ? runJob("tick", async () => {
+                const results = [];
+                for (const exchange of exchanges) results.push(await runTick(exchange));
+                return results;
+              })
             : new Response("unauthorized", { status: 401 }),
       },
     },
