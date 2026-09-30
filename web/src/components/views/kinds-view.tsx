@@ -5,14 +5,14 @@ import { useMemo } from "react";
 import PageHeader from "@/components/page-header";
 import { usePanel } from "@/components/panel-provider";
 import { resultsByKind } from "@/lib/analytics";
-import { money, pct, signedMoney } from "@/lib/format";
+import { pct } from "@/lib/format";
 import { MARKET_KIND_LABELS } from "@/lib/labels";
 
 const tone = (value: number | null) =>
   value === null || value === 0 ? "" : value > 0 ? "text-gain" : "text-loss";
 
 const KindsView = () => {
-  const { bets, mode } = usePanel();
+  const { bets, mode, money, signedMoney } = usePanel();
   const rows = useMemo(() => resultsByKind(bets, mode), [bets, mode]);
 
   return (
