@@ -123,8 +123,10 @@ jobs:
             -d '{"url": "${{ steps.deploy.outputs.url }}/telegram", "secret_token": "${{ secrets.APP_SECRET }}"}'
 
       # Create the scheduler jobs on the first deploy, keep them pointed at the service afterwards.
-      # Scans every 4h (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT; matches settings.scanEveryMinutes) settle, research
-      # and place bets themselves. The daily summary at 23:30 WAT settles again and reports the day.
+      # Bayse scans every 4h (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT; matches settings.scanEveryMinutes) settle,
+      # research and place bets themselves. Kalshi (paper) scans every 2h at :15 (settings.kalshiScanEveryMinutes): no AI
+      # cost, and its bets only happen late in the US day, when station readings settle the question.
+      # The daily summary at 23:30 WAT settles again and reports the day, per exchange.
       - name: Configure Cloud Scheduler
         run: |
           upsert() {
@@ -139,6 +141,7 @@ jobs:
             fi
           }
           upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
+          upsert clover-scan-kalshi "15 */2 * * *" "/jobs/scan?exchange=kalshi" 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
