@@ -110,7 +110,9 @@ export const finalValues = ({
   const series = runs.length > 0 ? runs : observed ? Array.from({ length: 21 }, () => []) : [];
   return series
     .map((future, index) => {
-      const at = observed ? observed.min + ((index + 0.5) / series.length) * (observed.max - observed.min) : null;
+      const at = observed
+        ? observed.min + ((index + 0.5) / series.length) * (observed.max - observed.min)
+        : null;
       const all = at === null ? future : [at, ...future];
       return all.length ? round(pick(...all)) : null;
     })
@@ -267,7 +269,8 @@ export const stationReadings = async (
         raw: feature.properties.rawMessage ?? "",
       }))
       .filter(
-        (reading): reading is { at: number; c: number; raw: string } => typeof reading.c === "number",
+        (reading): reading is { at: number; c: number; raw: string } =>
+          typeof reading.c === "number",
       );
     readings.push(
       ...batch.map(({ at, c, raw }) => ({
