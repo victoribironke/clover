@@ -1,7 +1,7 @@
 import { config } from "@/config.ts";
 import { dueBets, updateBet, type Bet } from "@/db/bets.ts";
 import { isPaused } from "@/db/kv.ts";
-import type { Exchange } from "@/exchanges/types.ts";
+import { EXCHANGE_LABELS, type Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { settings } from "@/settings.ts";
 import { expectedReturn } from "@/strategy/sizing.ts";
@@ -43,12 +43,21 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     }
 
     // capital was reserved when the bet was proposed; for live bets also confirm the wallet can cover it
+    if (!bet.dryRun && !exchange.canTrade) {
+      return await skip(bet, `No ${EXCHANGE_LABELS[exchange.name]} account is connected.`);
+    }
     if (!bet.dryRun && (await exchange.getAvailableBalance()) < bet.stake) {
-      return await skip(bet, "Not enough balance in the Bayse wallet.");
+      return await skip(bet, `Not enough balance in the ${EXCHANGE_LABELS[exchange.name]} wallet.`);
     }
 
     const order = bet.dryRun
-      ? { id: `paper-${bet.id}`, avgPrice: quote.avgPrice, shares: quote.shares, status: "filled" }
+      ? {
+          id: `paper-${bet.id}`,
+          avgPrice: quote.avgPrice,
+          shares: quote.shares,
+          amount: quote.amount,
+          status: "filled",
+        }
       : await exchange.placeOrder({
           eventId: bet.eventId,
           marketId: bet.marketId,
@@ -57,8 +66,11 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
           maxSlippage: settings.maxSlippage,
         });
 
+    // what was actually spent: Kalshi buys whole contracts, so it can come in under the stake
+    const stake = order.amount > 0 && order.amount < bet.stake ? order.amount : bet.stake;
     await updateBet(bet.id, {
       status: "placed",
+      stake,
       orderId: order.id,
       fillPrice: order.avgPrice || quote.avgPrice,
       shares: order.shares || quote.shares,
@@ -67,7 +79,7 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     await clearButtons(bet.telegramMessageId);
     await notify(
       `✅ ${bet.dryRun ? "Paper bet" : "Bet"} placed: ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b>\n` +
-        `${money(bet.stake)} at ${pct(order.avgPrice || quote.avgPrice)} · expected ${pct(edge, true)}`,
+        `${money(stake, bet.currency)} at ${pct(order.avgPrice || quote.avgPrice)} · expected ${pct(edge, true)}`,
     );
     log.info("bet placed", { betId: bet.id, orderId: order.id, dryRun: bet.dryRun });
   } catch (error) {
@@ -84,7 +96,9 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
 
 export const runExecute = async (exchange: Exchange) => {
   if (await isPaused()) return 0;
-  const due = await dueBets(new Date().toISOString());
+  const due = (await dueBets(new Date().toISOString())).filter(
+    (bet) => bet.exchange === exchange.name,
+  );
   for (const bet of due) await executeBet(exchange, bet);
   return due.length;
 };
