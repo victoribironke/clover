@@ -61,6 +61,7 @@ const bet = (overrides: Partial<Bet>): Bet => ({
 
 const exchangeWith = (orders: PlacedOrder[] | Error) =>
   ({
+    name: "bayse",
     payoutPerShare: 100,
     findOrders: async () => {
       if (orders instanceof Error) throw orders;
