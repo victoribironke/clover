@@ -1,4 +1,4 @@
-import type { Bet, BotSettings, SpendDay } from "./types";
+import type { Bet, SpendDay } from "./types";
 
 const LIVE = new Set(["pending", "placing", "placed"]);
 const SETTLED = new Set(["won", "lost", "void"]);
@@ -33,7 +33,8 @@ const settledAt = (bet: Bet) => bet.updatedAt;
 
 export const buildOverview = (
   bets: Bet[],
-  settings: BotSettings,
+  // the exchange's capital (the bets are already that exchange's)
+  capital: number,
   spend: SpendDay[],
   mode: "paper" | "live",
   now = new Date(),
@@ -49,7 +50,6 @@ export const buildOverview = (
   const realizedPnl = settled.reduce((total, bet) => total + (bet.pnl ?? 0), 0);
   const inPlay = open.reduce((total, bet) => total + bet.stake, 0);
   const staked = [...won, ...lost].reduce((total, bet) => total + bet.stake, 0);
-  const capital = settings.capitalNgn;
 
   let running = 0;
   const curve: CurvePoint[] = [
