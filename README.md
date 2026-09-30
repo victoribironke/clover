@@ -99,7 +99,7 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
   ```bash
   curl -X POST -d '' -H "Authorization: Bearer $APP_SECRET" https://clover-uhkg4fo2na-od.a.run.app/jobs/tick
   ```
-  Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, or `/jobs/scan?exchange=kalshi` for Kalshi. Sending `/scan` in Telegram runs both.
+  Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, `/jobs/scan?exchange=kalshi` for Kalshi, or `/jobs/scan?exchange=all` for both side by side (what `/scan` in Telegram does).
 - **Logs:** Cloud Run → `clover` → _Logs_. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
 - **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-kalshi`, `clover-summary` and `clover-study`. _Force run_ triggers one immediately.
 
