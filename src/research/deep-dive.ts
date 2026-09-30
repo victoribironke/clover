@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { gatherEventData, isRecurringCount } from "@/data/index.ts";
+import { gatherEventData } from "@/data/index.ts";
 import type { Confidence } from "@/db/bets.ts";
 import { recordUsage } from "@/db/spend.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
@@ -134,9 +134,10 @@ export const deepDive = async (event: MarketEvent): Promise<DeepDive> => {
 
   // Without a live reading the estimate rests on history (e.g. "this artist has never done
   // 285k first-day streams") while the real number may already be close. Cap confidence at
-  // "low", so the bet needs a much larger mispricing to go ahead. Recurring post counts are
-  // the exception: an account's posting history is solid evidence, so they cap at "medium".
-  const cap: Confidence = liveData ? "high" : isRecurringCount(event) ? "medium" : "low";
+  // "low", so the bet needs a much larger mispricing to go ahead. (Post counts used to cap at
+  // "medium" on posting history alone; that lost 22 of 27 bets, so they now need a live count
+  // like sports: settings.liveReadingRequiredKinds.)
+  const cap: Confidence = liveData ? "high" : "low";
   const estimates = decided.data.estimates.flatMap((estimate) => {
     const marketId = marketIdByRef.get(estimate.ref);
     if (!marketId) return [];
