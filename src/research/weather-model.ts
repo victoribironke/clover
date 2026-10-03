@@ -13,6 +13,7 @@ import {
 } from "@/data/station-weather.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
 import type { DeepDive } from "./deep-dive.ts";
+import { polymarketWeather } from "./polymarket-weather.ts";
 
 const DAY = 24 * 3_600_000;
 // 4 PM local standard time (5 PM during daylight saving): the day's high has usually been set
@@ -37,10 +38,7 @@ const signed = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 // readings so far plus the weather-model ensemble for the rest of the day, corrected by how far the
 // models missed this station on the last two finished days (src/data/station-weather.ts).
 // Free, so every open event can be checked on every scan. Returns null for anything else.
-export const weatherModel = async (
-  event: MarketEvent,
-  now = Date.now(),
-): Promise<DeepDive | null> => {
+const kalshiWeather = async (event: MarketEvent, now = Date.now()): Promise<DeepDive | null> => {
   const question = parseTemperatureQuestion(event);
   if (!question) return null;
 
@@ -132,3 +130,8 @@ export const weatherModel = async (
     costUsd: 0,
   };
 };
+
+// Each exchange settles its temperature markets differently: Kalshi on the official climate report
+// (above), Polymarket on the hourly airport reports (./polymarket-weather.ts)
+export const weatherModel = (event: MarketEvent, now = Date.now()) =>
+  event.exchange === "polymarket" ? polymarketWeather(event, now) : kalshiWeather(event, now);
