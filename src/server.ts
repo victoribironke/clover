@@ -6,7 +6,6 @@ import { runStudy } from "@/jobs/study.ts";
 import { runDailySummary } from "@/jobs/summary.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
-import { proxyToPanel } from "@/lib/panel-proxy.ts";
 import { rememberOrigin } from "@/lib/self.ts";
 import { bot } from "@/telegram/bot.ts";
 
@@ -28,8 +27,7 @@ const runJob = async (name: string, job: () => Promise<unknown>) => {
   }
 };
 
-// The container's only public entry point. Cloud Scheduler hits /jobs/*, Telegram hits /telegram,
-// and every other path is passed through to the web panel (src/lib/panel-proxy.ts).
+// The container's only entry point. Cloud Scheduler hits /jobs/*, Telegram hits /telegram.
 export const startServer = () =>
   Bun.serve({
     port: config.port,
@@ -46,7 +44,7 @@ export const startServer = () =>
       },
       "/jobs/scan": {
         // ?exchange=kalshi picks the exchange (default Bayse, which the original scheduler job calls);
-        // ?exchange=all scans every enabled exchange side by side, in this one request.
+        // a list (?exchange=kalshi,polymarket) or "all" scans several side by side, in this one request.
         // ?manual=1 is a /scan from Telegram: run even when paused, and always report back.
         POST: (request) => {
           if (!authorizedCron(request)) return new Response("unauthorized", { status: 401 });
@@ -54,14 +52,17 @@ export const startServer = () =>
           const manual = params.get("manual") === "1";
           const name = params.get("exchange") ?? bayse.name;
           const options = { force: manual, announce: manual };
-          if (name === "all") {
-            // each scan reports (or reports its failure) itself; one failing doesn't stop the other
-            return runJob("scan all", () =>
-              Promise.allSettled(exchanges.map((exchange) => runScanAndReport(exchange, options))),
-            );
+          const names =
+            name === "all" ? exchanges.map((exchange) => exchange.name) : name.split(",");
+          if (!names.every(isExchangeName))
+            return new Response("unknown exchange", { status: 400 });
+          if (names.length === 1) {
+            return runJob(`scan ${name}`, () => runScanAndReport(getExchange(names[0]!), options));
           }
-          if (!isExchangeName(name)) return new Response("unknown exchange", { status: 400 });
-          return runJob(`scan ${name}`, () => runScanAndReport(getExchange(name), options));
+          // each scan reports (or reports its failure) itself; one failing doesn't stop the others
+          return runJob(`scan ${names.join(",")}`, () =>
+            Promise.allSettled(names.map((each) => runScanAndReport(getExchange(each), options))),
+          );
         },
       },
       "/jobs/study": {
@@ -87,6 +88,5 @@ export const startServer = () =>
             : new Response("unauthorized", { status: 401 }),
       },
     },
-    // everything else is the web panel, running next to the bot in the same container
-    fetch: (request) => proxyToPanel(request, config.onCloudRun ? "https" : "http"),
+    fetch: () => new Response("not found", { status: 404 }),
   });
