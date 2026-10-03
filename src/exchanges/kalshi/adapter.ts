@@ -112,8 +112,9 @@ export const toMarket = (market: RawKalshiMarket): Market => {
     rules: market.rules_primary ?? "",
     status: marketStatus(market),
     outcomes: [yes, no],
-    // one contract costs under $1; $1 keeps stakes to whole contracts' worth
-    minOrderAmount: 1,
+    // the floor is one contract (under $1); any amount that buys one is fine
+    minOrderAmount: 0.01,
+    minShares: 1,
     // Kalshi's fee is charged per trade and included in quotes
     feePercentage: 0,
     resolvedOutcomeId: market.result === "yes" ? yes.id : market.result === "no" ? no.id : null,
