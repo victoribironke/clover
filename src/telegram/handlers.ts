@@ -1,8 +1,8 @@
 import { config } from "@/config.ts";
-import { getBet, listBets, updateBet } from "@/db/bets.ts";
+import { ALL_STATUSES, getBet, listBets, updateBet } from "@/db/bets.ts";
 import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
-import { exchanges, getExchange } from "@/exchanges/index.ts";
+import { exchanges, getExchange, isDryRun } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
@@ -15,8 +15,9 @@ import { summarize } from "@/study/stats.ts";
 import { bot } from "./bot.ts";
 import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./format.ts";
 import { notify } from "./notify.ts";
+import { resultsMessage } from "./results.ts";
 
-const HELP = `<b>Clover</b> scans Bayse and Kalshi (paper) for open markets, researches them, and bets where it finds an edge.
+const HELP = `<b>Clover</b> trades daily temperature markets on Bayse, Kalshi and Polymarket (the last two on paper), betting where the data gives it an edge.
 ${
   settings.quiet
     ? "🔕 Muted: bets are placed without messages, and a summary arrives daily at 23:30."
@@ -25,6 +26,7 @@ ${
 
 /status: bankroll and profit, per exchange
 /summary: the last 24 hours (also sent daily at 23:30)
+/results: all-time results by market type, and how accurate the bot's odds are
 /bets: pending and open bets
 /scan: run a scan now, on every exchange
 /study: how Bayse prices behave near the end, and void rates by type
@@ -53,6 +55,16 @@ export const registerHandlers = () => {
       await ctx.reply(await buildDailySummary(exchange, { shared: index === 0 }), {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
+      });
+    }
+  });
+
+  // one message per exchange: the record it's running now (paper while dryRun, live after)
+  bot.command("results", async (ctx) => {
+    const bets = await listBets(ALL_STATUSES, 10_000);
+    for (const exchange of exchanges) {
+      await ctx.reply(resultsMessage(exchange.name, exchange.currency, isDryRun(exchange), bets), {
+        parse_mode: "HTML",
       });
     }
   });
