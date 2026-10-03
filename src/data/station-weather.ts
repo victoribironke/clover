@@ -130,12 +130,16 @@ const inRange = (value: number, range: NonNullable<Market["range"]>) =>
 
 // Share of runs inside the band (with the measurement spread above), pulled slightly off 0 and 1:
 // a model this coarse is never certain
-export const bandProbability = (values: number[], range: NonNullable<Market["range"]>) => {
+export const bandProbability = (
+  values: number[],
+  range: NonNullable<Market["range"]>,
+  neighbourWeight = NEIGHBOUR_WEIGHT,
+) => {
   const inside = values.reduce(
     (total, value) =>
       total +
-      (1 - 2 * NEIGHBOUR_WEIGHT) * Number(inRange(value, range)) +
-      NEIGHBOUR_WEIGHT * (Number(inRange(value - 1, range)) + Number(inRange(value + 1, range))),
+      (1 - 2 * neighbourWeight) * Number(inRange(value, range)) +
+      neighbourWeight * (Number(inRange(value - 1, range)) + Number(inRange(value + 1, range))),
     0,
   );
   return (inside + 0.5) / (values.length + 1);
@@ -288,18 +292,19 @@ export const stationReadings = async (
     .sort((a, b) => a.at - b.at);
 };
 
-// Hourly °F per ensemble run, covering [from, end)
+// Hourly temperature per ensemble run (°F by default), covering [from, end)
 export const ensembleHours = async (
   latitude: number,
   longitude: number,
   from: number,
   end: number,
+  unit: "fahrenheit" | "celsius" = "fahrenheit",
 ): Promise<Ensemble> => {
   const startDate = new Date(from).toISOString().slice(0, 10);
   const endDate = new Date(end - 1).toISOString().slice(0, 10);
   const url =
     `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${latitude}&longitude=${longitude}` +
-    `&hourly=temperature_2m&temperature_unit=fahrenheit&models=icon_seamless,gfs_seamless,ecmwf_ifs025` +
+    `&hourly=temperature_2m&temperature_unit=${unit}&models=icon_seamless,gfs_seamless,ecmwf_ifs025` +
     `&timezone=GMT&start_date=${startDate}&end_date=${endDate}`;
   const data = await getJson<{ hourly?: Record<string, (number | null)[]> & { time: string[] } }>(
     url,
