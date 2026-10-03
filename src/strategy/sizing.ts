@@ -39,9 +39,11 @@ export type SizingInput = {
   // When the Kelly stake is positive but below the market's minimum order, bet the minimum
   // instead, as long as it's at most this fraction of the bankroll. 0 turns it off.
   minimumStakeFraction: number;
+  // smallest stake increment: 1 for naira, 0.01 for dollars (default 1)
+  step?: number;
 };
 
-// Stake in currency units, rounded down to a whole unit; 0 means "don't bet"
+// Stake in currency units, rounded down to a whole step; 0 means "don't bet"
 export const stakeFor = ({
   probability,
   price,
@@ -51,14 +53,15 @@ export const stakeFor = ({
   kellyMultiplier,
   maxBetFraction,
   minimumStakeFraction,
+  step = 1,
 }: SizingInput) => {
   const kelly = kellyFraction(probability, price) * kellyMultiplier;
   const raw = Math.min(kelly * bankroll, maxBetFraction * bankroll, deployable);
   // epsilon keeps float noise (499.9999…) from rounding a whole stake down
-  const stake = Math.floor(raw + 1e-9);
+  const stake = Math.round(Math.floor(raw / step + 1e-9) * step * 100) / 100;
   if (stake >= minOrderAmount) return stake;
   // A real but small edge: round up to the market minimum if that's still a small bet
   const minimumAllowed =
     minOrderAmount <= minimumStakeFraction * bankroll && minOrderAmount <= deployable;
-  return kelly > 0 && minimumAllowed ? minOrderAmount : 0;
+  return kelly > 0 && minimumAllowed ? Math.ceil(minOrderAmount / step - 1e-9) * step : 0;
 };
