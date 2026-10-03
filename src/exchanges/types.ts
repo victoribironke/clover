@@ -1,9 +1,13 @@
 // Exchange-agnostic shapes. Bayse and Kalshi map onto the same types (Polymarket next), so the
 // research/sizing/execution pipeline never needs to know which venue it is talking to.
 
-export type ExchangeName = "bayse" | "kalshi";
+export type ExchangeName = "bayse" | "kalshi" | "polymarket";
 
-export const EXCHANGE_LABELS: Record<ExchangeName, string> = { bayse: "Bayse", kalshi: "Kalshi" };
+export const EXCHANGE_LABELS: Record<ExchangeName, string> = {
+  bayse: "Bayse",
+  kalshi: "Kalshi",
+  polymarket: "Polymarket",
+};
 export type Currency = "NGN" | "USD";
 export type EventStatus = "open" | "paused" | "closed" | "resolved" | "cancelled" | "draft";
 
@@ -27,6 +31,8 @@ export type Market = {
   // for numeric bands (e.g. Kalshi "75° to 76°"): outcome1 wins when the value lands in
   // [min, max], both inclusive; null = open-ended on that side
   range?: { min: number | null; max: number | null };
+  // smallest order in shares (Kalshi: 1 contract, Polymarket: usually 5), on top of minOrderAmount
+  minShares?: number;
 };
 
 export type MarketEvent = {
