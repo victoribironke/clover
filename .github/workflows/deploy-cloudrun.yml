@@ -13,8 +13,6 @@ on:
       - "tsconfig.json"
       - "Dockerfile"
       - ".dockerignore"
-      - "start.sh"
-      - "web/**"
       - ".github/workflows/deploy-cloudrun.yml"
   workflow_dispatch:
 
@@ -41,18 +39,11 @@ jobs:
           echo "$HOME/.bun/bin" >> $GITHUB_PATH # Add Bun to PATH
 
       # A bot that moves money shouldn't ship with failing tests or type errors
-      - name: Typecheck and test (bot)
+      - name: Typecheck and test
         run: |
           bun install --frozen-lockfile
           bun run typecheck
           bun test
-
-      - name: Typecheck and test (web panel)
-        working-directory: web
-        run: |
-          bun install --frozen-lockfile
-          bun run typecheck
-          bun run test
 
       - name: Authenticate Google Cloud CLI
         uses: google-github-actions/auth@v2
@@ -90,9 +81,8 @@ jobs:
       #   alternative (--no-cpu-throttling) bills every second the instance is up; with a tick every
       #   5 minutes that is 24/7, about $44/month. Long work (scans) runs inside its own request.
       # --timeout=3600: a scan request stays open for the whole scan, which can take many minutes
-      # --memory=1Gi: two runtimes in one container (bot on Bun, panel on Node)
-      # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET;
-      #   the panel does its own Google sign-in
+      # --memory=512Mi: the bot alone (the web panel and its Node runtime were removed on 2026-10-03)
+      # --allow-unauthenticated: Telegram must reach /telegram; /jobs/* are guarded by APP_SECRET
       # --service-account: runs as clover-runtime, which only has Firestore access
       # Only secrets go here; every other setting lives in src/settings.ts
       - name: Deploy to Cloud Run
@@ -102,7 +92,7 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
-          flags: --allow-unauthenticated --max-instances=1 --cpu-throttling --timeout=3600 --memory=1Gi --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          flags: --allow-unauthenticated --max-instances=1 --cpu-throttling --timeout=3600 --memory=512Mi --service-account=clover-runtime@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
           env_vars_update_strategy: overwrite
           env_vars: |-
             BAYSE_PUBLIC_KEY=${{ secrets.BAYSE_PUBLIC_KEY }}
@@ -112,9 +102,6 @@ jobs:
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
             APP_SECRET=${{ secrets.APP_SECRET }}
-            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-            AUTH_GOOGLE_ID=${{ secrets.AUTH_GOOGLE_ID }}
-            AUTH_GOOGLE_SECRET=${{ secrets.AUTH_GOOGLE_SECRET }}
 
       - name: Set Telegram Webhook
         run: |
@@ -124,8 +111,9 @@ jobs:
 
       # Create the scheduler jobs on the first deploy, keep them pointed at the service afterwards.
       # Bayse scans every 4h (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT; matches settings.scanEveryMinutes) settle,
-      # research and place bets themselves. Kalshi (paper) scans every 2h at :15 (settings.kalshiScanEveryMinutes): no AI
-      # cost, and its bets only happen late in the US day, when station readings settle the question.
+      # research and place bets themselves. Kalshi and Polymarket (paper) scan together every 2h at :15
+      # (clover-scan-weather): no AI cost, and their bets only happen late in each city's day, when the
+      # station's readings settle the question.
       # The daily summary at 23:30 WAT settles again and reports the day, per exchange.
       - name: Configure Cloud Scheduler
         run: |
@@ -141,13 +129,14 @@ jobs:
             fi
           }
           upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
-          upsert clover-scan-kalshi "15 */2 * * *" "/jobs/scan?exchange=kalshi" 1800s
+          # Kalshi and Polymarket weather together (no AI), every 2 hours
+          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi,polymarket" 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
 
           # retired jobs: removing them from this list alone would leave them running
-          for retired in clover-tick; do
+          for retired in clover-tick clover-scan-kalshi; do
             if gcloud scheduler jobs describe "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
               gcloud scheduler jobs delete "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" --quiet
             fi
