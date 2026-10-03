@@ -1,5 +1,6 @@
 import { marketKind } from "@/data/kind.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
+import { allowedKinds } from "@/exchanges/mode.ts";
 import { settings } from "@/settings.ts";
 
 const MINUTE = 60 * 1000;
@@ -14,7 +15,11 @@ export const eligibleEvents = (events: MarketEvent[], exclude: Set<string>, now 
       if (!event.supportedCurrencies.includes("NGN")) return false;
       if (!(settings.categories as readonly string[]).includes(event.category)) return false;
     }
-    if ((settings.excludedKinds as readonly string[]).includes(marketKind(event))) return false;
+    const kind = marketKind(event);
+    if ((settings.excludedKinds as readonly string[]).includes(kind)) return false;
+    // per exchange: only the kinds it trades (weather only, from 2026-10-03)
+    const kinds = allowedKinds(event.exchange);
+    if (kinds && !kinds.includes(kind)) return false;
     if (!event.markets.some((market) => market.status === "open")) return false;
     // Many events carry only one of the two dates; either is a fair stand-in for the other.
     // No dates at all means a long-running market (e.g. an election), which is out of scope.
