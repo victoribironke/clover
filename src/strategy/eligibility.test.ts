@@ -9,11 +9,11 @@ const event = (overrides: Partial<MarketEvent>): MarketEvent => ({
   exchange: "bayse",
   id: "e1",
   slug: "e1",
-  title: "Test",
+  title: "Will the Temperature in Lagos, Nigeria be above 28°C by 5:00 PM WAT on Sept 26?",
   description: "",
   additionalContext: "",
   resolutionSource: "",
-  category: "ECONOMY",
+  category: "OTHERS",
   type: "single",
   engine: "AMM",
   status: "open",
@@ -70,8 +70,8 @@ describe("eligibleEvents", () => {
       expect(passes({ category, resolutionDate: inHours(5) })).toBe(false);
     }
   });
-  test("keeps data-driven categories", () => {
-    for (const category of ["ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS", "SPORTS"]) {
+  test("keeps weather in the data-driven categories", () => {
+    for (const category of ["ECONOMY", "SOCIAL MEDIA", "ENTERTAINMENT", "OTHERS"]) {
       expect(passes({ category, resolutionDate: inHours(5) })).toBe(true);
     }
   });
@@ -106,13 +106,16 @@ describe("excluded kinds", () => {
       }),
     ).toBe(false);
   });
-  test("keeps post counts in the same category", () => {
-    expect(
-      passes({
-        category: "SOCIAL MEDIA",
-        title: "Pop Base’s Number of X Posts Today, September 25, 2026?",
-        resolutionDate: inHours(5),
-      }),
-    ).toBe(true);
+});
+
+describe("weather only on Bayse (from 2026-10-03)", () => {
+  test("drops everything that isn't weather", () => {
+    for (const [category, title] of [
+      ["SOCIAL MEDIA", "Pop Base’s Number of X Posts Today, September 25, 2026?"],
+      ["SPORTS", "Argentina vs Bolivia: Total Goals"],
+      ["ENTERTAINMENT", "#1 Song on Apple Music Top Songs by September 27?"],
+    ] as const) {
+      expect(passes({ category, title, resolutionDate: inHours(5) })).toBe(false);
+    }
   });
 });
