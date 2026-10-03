@@ -2,13 +2,15 @@
 
 A betting assistant for prediction markets. It scans [Bayse Markets](https://docs.bayse.markets/) for open markets and researches the promising ones: Gemini 3.8 Flash searches the web with Google Search and writes a fact brief, and OpenAI's gpt-6-luna makes the call from it. When it finds an edge, it sends you the bet on Telegram. You have a window to cancel before it places the bet.
 
-It also paper-trades [Kalshi](https://kalshi.com) (USD): its 48 daily US high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) below).
+It also paper-trades [Kalshi](https://kalshi.com) and [Polymarket](https://polymarket.com) (USD): their daily high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) and [Polymarket](#polymarket-paper) below).
+
+**Weather only, from 2026-10-03.** Kalshi weather won 9 of 14 paper bets (+$73 on $100) while every other kind of market lost on Bayse, so every exchange now trades temperature markets only (`kinds` in `settings.exchanges`). Other markets come back once the weather research is as accurate as it can be.
 
 ## How it works
 
 ```
 every 4h   Bayse scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
-every 2h   Kalshi scan ─► settle ─► today's temperature markets ─► station readings + weather ensemble (no AI)
+every 2h   Kalshi + Polymarket scan ─► settle ─► today's temperature markets ─► station readings + weather ensemble (no AI)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -26,7 +28,7 @@ every 2h   Kalshi scan ─► settle ─► today's temperature markets ─► s
 - **Live data first.** Before research, the bot fetches hard data itself where it can: a 122-run weather-model ensemble for temperature markets, and public mirrors of the Spotify and Apple Music Nigeria charts. The research must report the current reading it based its estimate on, which is shown on every bet. Without a live reading, confidence is capped at low, so history alone rarely triggers a bet. Sports and post counts need one to be bet on at all (bookmaker odds for the line, or the count so far).
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
-- **Capital.** Each exchange has its own capital (`exchanges` in `src/settings.ts`): ₦10,000 on Bayse, $100 (paper) on Kalshi. The bot never works with more; anything above is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
+- **Capital.** Each exchange has its own capital (`exchanges` in `src/settings.ts`): ₦10,000 on Bayse, $5 each (paper) on Kalshi and Polymarket. Small bankrolls get bigger per-bet fractions (`maxBetFraction`, `minimumStakeFraction` per exchange), or nothing would ever reach Kalshi's 1-contract or Polymarket's 5-share minimum. The bot never works with more; anything above is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
 - **Research cost.** Every model call (Gemini and OpenAI) is priced from its token and search counts. Scans stop for the day at the daily budget. `/status` and every bet message show the spend.
 - **Before placing,** it re-checks that the market is still open and re-quotes. If the edge is gone, it skips the bet and tells you.
 
@@ -39,7 +41,17 @@ Kalshi's market data is public, so this needs no account and no key. `canTrade` 
 - **Bets only late in the day.** Forecasts alone don't beat these markets: on the first check they sat 2°F from the price in several cities, which is a whole band. So Kalshi bets need the station's readings after 4 PM local standard time, when the day's high has usually been set. Earlier in the day events are priced and reported, not bet on.
 - **Quotes** walk Kalshi's live order book, whole contracts only, with Kalshi's fee included.
 
-If the paper results hold up, the plan is to fund Kalshi and Polymarket with about $5 each and drop Bayse.
+## Polymarket (paper)
+
+Polymarket's Gamma API (events and markets) and its CLOB order books are public: no wallet, no key. `canTrade` is false ([`src/exchanges/polymarket/adapter.ts`](src/exchanges/polymarket/adapter.ts)).
+
+- **Markets.** "Highest/Lowest temperature in {city} on {date}" for about 50 cities, one band per degree. Only the ones that settle on NOAA's airport reports (`weather.gov/wrh/timeseries?site=…`) are traded; a few use other sources (e.g. the Hong Kong Observatory) and are skipped.
+- **Settlement is the reports themselves.** The answer is the highest (or lowest) reading NOAA lists for the station's local day, in whole degrees (°F in the US, from hourly reports only; °C elsewhere). So the readings so far are exactly the answer so far. Reports come from [aviationweather.gov](https://aviationweather.gov), for any airport worldwide.
+- **Pricing** ([`src/research/polymarket-weather.ts`](src/research/polymarket-weather.ts)): the readings so far, plus the ensemble for the hours left, corrected by half the models' recent miss at that station.
+- **Bets only late in the day:** after 4 PM local for highs, after 10 PM for lows (an evening can still undercut a morning low).
+- **Quotes** walk the CLOB's asks with the 5% weather fee (`rate × shares × price × (1 − price)`). The smallest order is 5 shares, so on $5 only outcomes up to about 20¢ fit the $1-a-bet limit.
+
+Going live needs a funded account on each: Kalshi requires US residency; Polymarket needs a crypto wallet and signed orders. Neither is connected yet.
 
 ## Settings vs secrets
 
@@ -85,7 +97,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
    - Bayse scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
-   - Kalshi scan every 2 hours at :15 (`/jobs/scan?exchange=kalshi`)
+   - Kalshi and Polymarket scan every 2 hours at :15 (`clover-scan-weather`, `/jobs/scan?exchange=kalshi,polymarket`)
    - late-price study every 6 hours (no model calls, no money)
 
 Send `/status` to your bot to check it's alive.
@@ -99,9 +111,9 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
   ```bash
   curl -X POST -d '' -H "Authorization: Bearer $APP_SECRET" https://clover-uhkg4fo2na-od.a.run.app/jobs/tick
   ```
-  Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, `/jobs/scan?exchange=kalshi` for Kalshi, or `/jobs/scan?exchange=all` for both side by side (what `/scan` in Telegram does).
+  Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, `/jobs/scan?exchange=kalshi` (or `polymarket`, or a comma list) for the others, or `/jobs/scan?exchange=all` for everything side by side (what `/scan` in Telegram does).
 - **Logs:** Cloud Run → `clover` → _Logs_. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
-- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-kalshi`, `clover-summary` and `clover-study`. _Force run_ triggers one immediately.
+- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-weather`, `clover-summary` and `clover-study`. _Force run_ triggers one immediately.
 
 ## Running locally
 
@@ -113,25 +125,43 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
    gcloud config set project fl-clover
    ```
    Local runs use `dev_*` collections, so they never touch production data.
-4. `bun run markets` lists open Bayse markets and what passes the filters; `bun src/cli.ts markets kalshi` does the same for Kalshi. Neither makes model calls or moves money.
+4. `bun run markets` lists open Bayse markets and what passes the filters; `bun src/cli.ts markets kalshi` (or `polymarket`) does the same there. Neither makes model calls or moves money.
 5. `bun run dev` starts the bot with long polling and in-process timers.
 
 Running locally with the production bot token switches Telegram from the webhook to polling. The next deploy switches it back. To avoid that, create a second bot for local testing.
 
 ### Telegram commands
 
-| Command              | What it does                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------- |
-| `/status`            | Per exchange: capital, money in play, realized P&L, withdrawable profit, wallet, research spend |
-| `/summary`           | The last 24 hours per exchange: bets placed, results, open bets, research spend, problems       |
-| `/bets`              | Pending and open bets                                                                           |
-| `/scan`              | Run a scan now, on every exchange                                                               |
-| `/study`             | Late-price study: are prices fair near the end, void rates by market type                       |
-| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                          |
+| Command              | What it does                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/status`            | Per exchange: capital, money in play, realized P&L, withdrawable profit, wallet, research spend                                     |
+| `/results`           | All-time results per exchange: by market type (won, P&L, return) and calibration (said 70% → won how often; bot vs market accuracy) |
+| `/summary`           | The last 24 hours per exchange: bets placed, results, open bets, research spend, problems                                           |
+| `/bets`              | Pending and open bets                                                                                                               |
+| `/scan`              | Run a scan now, on every exchange                                                                                                   |
+| `/study`             | Late-price study: are prices fair near the end, void rates by market type                                                           |
+| `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                                                              |
 
-## Web panel
+## Going live on Kalshi and Polymarket
 
-A read-only admin panel (results, bankroll curve, bets) lives in [`web/`](web/README.md). It runs in the same container as the bot, at https://clover-uhkg4fo2na-od.a.run.app.
+Both run on paper now: the bot reads their public market data and places no orders. To trade for real, each needs a funded account and API credentials, then order placement has to be connected in the code. Never paste keys into a chat: they go in GitHub secrets (and `.env` for local runs) only. Check the exchange still accepts users from your country first: [Kalshi](https://where.kalshi.com/), [Polymarket](https://help.polymarket.com/en/articles/13364163-geographic-restrictions).
+
+**Kalshi**
+
+1. Sign up at kalshi.com and complete identity verification (18+, ID document).
+2. Deposit about $5, using whatever method the app offers you. Check its minimum deposit.
+3. _Account Settings → Profile_ ([kalshi.com/account/profile](https://kalshi.com/account/profile)) → _API Keys → Create New API Key_ (the default Ed25519 type is fine).
+4. Save the **Key ID** and the **private key** (`.pem` file) at once: Kalshi shows the private key only once.
+5. GitHub secrets: `KALSHI_API_KEY_ID` (the Key ID) and `KALSHI_PRIVATE_KEY` (the whole `.pem` file, `BEGIN`/`END` lines included).
+6. Recommended: a free [demo](https://docs.kalshi.com/getting_started/demo_env) account and key too (`KALSHI_DEMO_API_KEY_ID`, `KALSHI_DEMO_PRIVATE_KEY`), to test real order placement with play money first.
+
+**Polymarket**
+
+1. Sign up at polymarket.com. Safest: with a fresh wallet (e.g. MetaMask) used only for the bot, holding only the bot's money.
+2. Deposit about $5 of USDC on the Polygon network (Polymarket converts it to pUSD, its trading dollar). Check the minimum and the network before sending.
+3. GitHub secrets: `POLYMARKET_PRIVATE_KEY` (the wallet's private key) and `POLYMARKET_FUNDER_ADDRESS` (the wallet address on your Polymarket profile, which holds the funds). The CLOB API key, secret and passphrase are derived from the private key, so the bot creates them itself.
+
+**Then** live order placement gets connected (signed requests on Kalshi; signed orders plus one-time token approvals on Polymarket) and tested on Kalshi's demo, then with one minimum-size real order each. Nothing goes live until `dryRun: false` is set for that exchange in `src/settings.ts`, and bets are sized from the $5 capital whatever the wallet holds.
 
 ## Layout
 
@@ -139,9 +169,9 @@ A read-only admin panel (results, bankroll curve, bets) lives in [`web/`](web/RE
 src/
   settings.ts       all tunable values
   config.ts         secrets (env) + local/Cloud Run detection
-  exchanges/        Exchange interface; Bayse adapter (HMAC signing, quotes, orders); Kalshi adapter (public data, paper)
+  exchanges/        Exchange interface; Bayse adapter (HMAC signing, quotes, orders); Kalshi and Polymarket adapters (public data, paper)
   llm/              Gemini (search) and OpenAI (reasoning) clients, pricing
-  research/         screening + deep dive prompts and schemas; weather-model.ts prices Kalshi without AI
+  research/         screening + deep dive prompts and schemas; weather-model.ts and polymarket-weather.ts price temperature markets without AI
   data/             hard data fetched before research: weather ensembles, charts, NWS station readings
   strategy/         probability blending, Kelly sizing, bankroll rules, bet proposal
   jobs/             scan, execute, settle, tick
