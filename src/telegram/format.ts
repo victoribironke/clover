@@ -305,8 +305,8 @@ export const dailySummaryMessage = ({
     `<b>Realized P&L:</b> ${signedMoney(bankroll.realizedPnl, c)} · withdrawable <b>${money(bankroll.withdrawable, c)}</b>`,
     wallet
       ? `<b>${EXCHANGE_LABELS[bankroll.exchange]} wallet:</b> ${money(wallet.available, c)}`
-      : bankroll.exchange === "kalshi"
-        ? "<b>Kalshi wallet:</b> <i>no account connected (paper only)</i>"
+      : bankroll.exchange !== "bayse"
+        ? `<b>${EXCHANGE_LABELS[bankroll.exchange]} wallet:</b> <i>no account connected (paper only)</i>`
         : "<b>Bayse wallet:</b> <i>couldn't read it</i>",
   );
   if (shared) lines.push(`<b>Research:</b> ${deepDives} AI deep dives · ${usd(spentUsd)} today`);
@@ -327,8 +327,8 @@ const walletLines = (wallet: Wallet | null, bankroll: Bankroll) => {
   const name = EXCHANGE_LABELS[bankroll.exchange];
   if (!wallet)
     return [
-      bankroll.exchange === "kalshi"
-        ? "Kalshi wallet: <i>no account connected (paper only)</i>"
+      bankroll.exchange !== "bayse"
+        ? `${name} wallet: <i>no account connected (paper only)</i>`
         : `${name} wallet: <i>couldn't read it right now</i>`,
     ];
   const pending =
