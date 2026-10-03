@@ -1,6 +1,6 @@
 import { config } from "@/config.ts";
-import { publishSettings, releaseHeldLocks } from "@/db/kv.ts";
-import { bayse, exchanges, kalshi } from "@/exchanges/index.ts";
+import { releaseHeldLocks } from "@/db/kv.ts";
+import { bayse, exchanges, kalshi, polymarket } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
@@ -42,13 +42,6 @@ const main = async () => {
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
   process.once("SIGINT", () => void shutdown("SIGINT"));
   registerHandlers();
-  // best effort: the web panel falls back to defaults if this fails
-  await publishSettings({
-    ...settings,
-    // the fields older panel code reads: Bayse's mode and capital
-    dryRun: settings.exchanges.bayse.dryRun,
-    capitalNgn: settings.exchanges.bayse.capital,
-  }).catch((error) => log.warn("publish settings failed", { error: errorMessage(error) }));
   const server = startServer();
   log.info("server listening", {
     port: server.port,
@@ -59,6 +52,7 @@ const main = async () => {
   await bot.api.setMyCommands([
     { command: "status", description: "Bankroll and profit" },
     { command: "summary", description: "The last 24 hours" },
+    { command: "results", description: "All-time results and accuracy" },
     { command: "bets", description: "Pending and open bets" },
     { command: "scan", description: "Run a scan now" },
     { command: "study", description: "Late-price study and void rates" },
@@ -80,6 +74,11 @@ const main = async () => {
     }
     if (exchanges.includes(kalshi)) {
       every(settings.kalshiScanEveryMinutes, "scan kalshi", () => runScanAndReport(kalshi))();
+    }
+    if (exchanges.includes(polymarket)) {
+      every(settings.polymarketScanEveryMinutes, "scan polymarket", () =>
+        runScanAndReport(polymarket),
+      )();
     }
     every(settings.studyEveryMinutes, "study", () => runStudy(bayse))();
   }
