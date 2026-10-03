@@ -89,11 +89,12 @@ const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
     paid: true,
   },
   "weather-model": {
-    // Only today's markets (closing within a day): bets wait for the station's readings after the
-    // day's peak, so tomorrow's can't be bet on yet. Soonest first.
+    // Only today's markets: bets wait for the station's readings late in the day, so tomorrow's
+    // can't be bet on yet. 36 hours, because Polymarket's "close" is noon UTC the day after (when
+    // every time zone's day is over). Soonest first.
     pick: async (eligible) =>
       eligible
-        .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 24 * HOUR)
+        .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 36 * HOUR)
         .sort((a, b) => (a.closingDate ?? "").localeCompare(b.closingDate ?? ""))
         .map((event) => event.id),
     research: async (event) => {
