@@ -2,6 +2,7 @@ import { config } from "@/config.ts";
 import { settings } from "@/settings.ts";
 import { createBayseExchange } from "./bayse/adapter.ts";
 import { createKalshiExchange } from "./kalshi/adapter.ts";
+import { createPolymarketExchange } from "./polymarket/adapter.ts";
 import type { Exchange, ExchangeName } from "./types.ts";
 
 export { isDryRun } from "./mode.ts";
@@ -17,7 +18,12 @@ export const kalshi = createKalshiExchange({
   series: settings.kalshiSeries,
 });
 
-const ALL: Record<ExchangeName, Exchange> = { bayse, kalshi };
+export const polymarket = createPolymarketExchange({
+  gammaUrl: settings.polymarketGammaUrl,
+  clobUrl: settings.polymarketClobUrl,
+});
+
+const ALL: Record<ExchangeName, Exchange> = { bayse, kalshi, polymarket };
 
 // the exchanges turned on in settings.exchanges, Bayse first
 export const exchanges = Object.values(ALL).filter(
