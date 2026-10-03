@@ -1,4 +1,6 @@
 import { marketKind } from "@/data/kind.ts";
+import { sizingFor } from "@/exchanges/mode.ts";
+import { money } from "@/telegram/format.ts";
 import type { Confidence } from "@/db/bets.ts";
 import type { Exchange, Market, MarketEvent, Outcome } from "@/exchanges/types.ts";
 import { describeError } from "@/lib/errors.ts";
@@ -62,6 +64,9 @@ const priceStake = async (
   outcome: Outcome,
   probability: number,
   initialStake: number,
+  // the smallest order, and the stake increment (₦1, or 1¢)
+  minStake: number,
+  step: number,
 ): Promise<Priced> => {
   let stake = initialStake;
   let last: Priced = {
@@ -70,7 +75,7 @@ const priceStake = async (
     expectedReturn: 0,
     reason: "no quote",
   };
-  for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= market.minOrderAmount; attempt++) {
+  for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= minStake - 1e-9; attempt++) {
     const quote = await exchange.quote({
       eventId: event.id,
       marketId: market.id,
@@ -89,7 +94,7 @@ const priceStake = async (
         ? `fees and price impact eat the edge (needs ${needs})`
         : "not enough liquidity",
     };
-    stake = Math.floor(stake / 2);
+    stake = Math.floor(stake / 2 / step) * step;
   }
   return last;
 };
@@ -150,27 +155,43 @@ export const proposeBet = async (
         continue;
       }
 
+      // the smallest order this outcome takes: the exchange minimum, or its minimum share count
+      // at this price (Polymarket: 5 shares), plus a little for the fee
+      const minStake = Math.max(
+        market.minOrderAmount,
+        (market.minShares ?? 0) * outcome.price * 1.02,
+      );
       const stake = stakeFor({
         probability,
         price: outcome.price,
         bankroll: bankroll.bankroll,
         deployable: bankroll.deployable,
-        minOrderAmount: market.minOrderAmount,
+        minOrderAmount: minStake,
+        step: bankroll.currency === "USD" ? 0.01 : 1,
         kellyMultiplier: settings.kellyFraction,
-        maxBetFraction: settings.maxBetFraction,
-        minimumStakeFraction: settings.minimumStakeFraction,
+        ...sizingFor(exchange.name),
       });
       if (stake === 0) {
         miss(
           outcome.price,
           listedEdge,
-          `stake would be under the ₦${market.minOrderAmount} minimum, which is too big a share of the bankroll`,
+          `the smallest order (${money(minStake, bankroll.currency)}) is too big a share of the bankroll`,
         );
         continue;
       }
 
       try {
-        const priced = await priceStake(exchange, event, market, outcome, probability, stake);
+        const step = bankroll.currency === "USD" ? 0.01 : 1;
+        const priced = await priceStake(
+          exchange,
+          event,
+          market,
+          outcome,
+          probability,
+          stake,
+          minStake,
+          step,
+        );
         if (!priced.ok) {
           miss(priced.quotedPrice, priced.expectedReturn, priced.reason);
           continue;
