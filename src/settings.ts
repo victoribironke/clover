@@ -6,14 +6,41 @@ export const settings = {
   // Each exchange has its own capital, in its own currency: the bot only ever works with that
   // much, and anything above it is withdrawable profit. dryRun true = paper trading: everything
   // runs, but no real orders are sent. Flip to false only after paper results look good.
+  // `kinds`: the only market kinds (src/data/kind.ts) researched there; null = everything the
+  // filters below allow. Weather only everywhere from 2026-10-03: Kalshi weather went 9 of 14
+  // (+$73 on $100 paper) while everything else on Bayse lost.
+  // `maxBetFraction` / `minimumStakeFraction` override the defaults below. A $5 bankroll needs
+  // bigger fractions to place anything: Kalshi's smallest order is 1 contract (up to $0.99),
+  // Polymarket's is 5 shares ($2.50 at 50¢).
   exchanges: {
-    // NGN. Researched with AI (Gemini search + gpt-6-luna).
-    bayse: { enabled: true, dryRun: true, capital: 10_000, research: "ai" },
+    // NGN. Researched with AI (Gemini search + gpt-6-luna), plus the weather ensemble Data line.
+    bayse: { enabled: true, dryRun: true, capital: 10_000, research: "ai", kinds: ["weather"] },
     // USD, paper only for now: no account is connected, it reads Kalshi's public market data
     // (from 2026-09-30). Daily US high/low temperature markets, priced from a weather-model
     // ensemble plus the settlement station's own readings, with no AI calls
-    // (src/research/weather-model.ts).
-    kalshi: { enabled: true, dryRun: true, capital: 100, research: "weather-model" },
+    // (src/research/weather-model.ts). Capital $100 until 2026-10-03, then $5.
+    kalshi: {
+      enabled: true,
+      dryRun: true,
+      capital: 5,
+      research: "weather-model",
+      kinds: ["weather"],
+      maxBetFraction: 0.2,
+      minimumStakeFraction: 0.2,
+    },
+    // USD, paper only for now (from 2026-10-03): public market data, no wallet connected. Daily
+    // high/low temperature markets in ~50 cities, settled on an airport's hourly reports
+    // (src/research/weather-model.ts). Its 5-share minimum means a $5 bankroll can only buy
+    // outcomes priced up to 20¢ at these fractions ($1 a bet).
+    polymarket: {
+      enabled: true,
+      dryRun: true,
+      capital: 5,
+      research: "weather-model",
+      kinds: ["weather"],
+      maxBetFraction: 0.2,
+      minimumStakeFraction: 0.2,
+    },
   },
   // Muted: no per-bet Telegram messages. Problems are saved and everything is reported in one
   // daily summary (23:30 WAT). Your own /scan still answers. Set false to hear about every bet.
@@ -92,9 +119,14 @@ export const settings = {
   // Kalshi scans run every 2 hours (clover-scan-kalshi): no AI cost, and same-day station
   // readings change the picture through the day
   kalshiScanEveryMinutes: 120,
+  // Polymarket scans with Kalshi (clover-scan-weather, every 2 hours)
+  polymarketScanEveryMinutes: 120,
 
   bayseBaseUrl: "https://relay.bayse.markets",
   kalshiBaseUrl: "https://external-api.kalshi.com/trade-api/v2",
+  // Polymarket: Gamma lists events, the CLOB serves order books (both public)
+  polymarketGammaUrl: "https://gamma-api.polymarket.com",
+  polymarketClobUrl: "https://clob.polymarket.com",
   // Kalshi's daily US temperature series (checked 2026-09-30: all have open events every day).
   // Each settles on one NWS climate station, named in the rules as "(CLIxxx)".
   kalshiSeries: [
