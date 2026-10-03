@@ -7,6 +7,8 @@ const EVENT_URL: Record<ExchangeName, (eventId: string) => string> = {
   bayse: (eventId) => `https://app.bayse.markets/market/${encodeURIComponent(eventId)}`,
   kalshi: (eventId) =>
     `https://kalshi.com/markets/${encodeURIComponent(eventId.split("-")[0]!.toLowerCase())}`,
+  // Polymarket event ids are their slugs
+  polymarket: (eventId) => `https://polymarket.com/event/${encodeURIComponent(eventId)}`,
 };
 
 export const eventUrl = (exchange: ExchangeName, eventId: string) => EVENT_URL[exchange](eventId);
