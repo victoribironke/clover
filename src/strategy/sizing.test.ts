@@ -76,3 +76,24 @@ describe("stakeFor", () => {
     expect(stakeFor({ ...solana, probability: 0.38 })).toBe(0);
   });
 });
+
+test("dollar stakes keep cents, and a 1-contract minimum can round up", () => {
+  const base = {
+    bankroll: 5,
+    deployable: 5,
+    kellyMultiplier: 0.25,
+    maxBetFraction: 0.2,
+    minimumStakeFraction: 0.2,
+    step: 0.01,
+  };
+  // quarter Kelly on a 60% shot at 50¢ = 5% of $5 = $0.25
+  expect(stakeFor({ ...base, probability: 0.6, price: 0.5, minOrderAmount: 0.01 })).toBeCloseTo(
+    0.25,
+  );
+  // Polymarket's 5 shares at 18¢ ≈ $0.92, within 20% of $5: bet the minimum
+  expect(stakeFor({ ...base, probability: 0.21, price: 0.18, minOrderAmount: 0.92 })).toBeCloseTo(
+    0.92,
+  );
+  // 5 shares at 50¢ = $2.55: too big a share of $5
+  expect(stakeFor({ ...base, probability: 0.55, price: 0.5, minOrderAmount: 2.55 })).toBe(0);
+});
