@@ -155,7 +155,7 @@ export const scanReportMessage = (report: ScanReport) => {
     return `⏸ <b>${name} scan skipped</b>\n${escapeHtml(report.skippedReason)}`;
   const lines = [
     `🔎 <b>${name} scan done</b>`,
-    `${report.open} open · ${report.eligible} eligible · ${report.researched} researched · <b>${report.proposed} proposed</b>${report.placed ? ` · ${report.placed} placed` : ""}`,
+    `${report.open} open · ${report.eligible} eligible · ${report.researched} researched${report.waiting ? ` (${report.waiting} too early in their day)` : ""} · <b>${report.proposed} proposed</b>${report.placed ? ` · ${report.placed} placed` : ""}`,
   ];
   const ranked = [...report.reviewed].sort(
     (a, b) =>
