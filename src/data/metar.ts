@@ -30,13 +30,19 @@ const fetchRaw = (icao: string, hours: number) => {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data;
   const data = (async () => {
-    const response = await fetch(
-      `https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(icao)}&format=json&hours=${hours}`,
-      {
+    const url = `https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(icao)}&format=json&hours=${hours}`;
+    let response = await fetch(url, {
+      headers: { "User-Agent": "clover-bot (prediction market research)" },
+      signal: AbortSignal.timeout(20_000),
+    });
+    // reads: back off and retry on rate limits and server errors
+    for (let attempt = 0; !response.ok && (response.status === 429 || response.status >= 500) && attempt < 3; attempt++) {
+      await Bun.sleep(2000 * 2 ** attempt);
+      response = await fetch(url, {
         headers: { "User-Agent": "clover-bot (prediction market research)" },
         signal: AbortSignal.timeout(20_000),
-      },
-    );
+      });
+    }
     if (!response.ok) throw new Error(`${response.status} from aviationweather.gov for ${icao}`);
     // an empty body means no reports in the window
     const text = await response.text();
