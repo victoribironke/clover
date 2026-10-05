@@ -196,9 +196,15 @@ const getJson = <T>(url: string, headers?: Record<string, string>): Promise<T> =
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data as Promise<T>;
   const data = (async () => {
-    const response = await fetch(url, { headers, signal: AbortSignal.timeout(20_000) });
-    if (!response.ok) throw new Error(`${response.status} from ${new URL(url).host}`);
-    return (await response.json()) as T;
+    // Open-Meteo answers 429 when two scans ask at once (23 markets lost one scan on 2026-10-05):
+    // back off and try again, these are reads
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(20_000) });
+      if (response.ok) return (await response.json()) as T;
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt >= 3) throw new Error(`${response.status} from ${new URL(url).host}`);
+      await Bun.sleep(2000 * 2 ** attempt);
+    }
   })();
   // failures aren't kept: the next caller tries again
   data.catch(() => cache.delete(url));
