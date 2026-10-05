@@ -42,6 +42,8 @@ export type ScanReport = {
   open: number;
   eligible: number;
   researched: number;
+  // weather markets skipped because it's too early in their local day to bet
+  waiting?: number;
   proposed: number;
   // bets this scan sent for placing (its own, plus any whose cancel window ended since the last one)
   placed: number;
@@ -77,7 +79,8 @@ const skipped = (exchange: ExchangeName, skippedReason: string): ScanReport => (
 // "weather-model" = price every event from data (free, so all of them, every scan)
 type Researcher = {
   pick: (eligible: MarketEvent[]) => Promise<string[]>;
-  research: (event: MarketEvent) => Promise<DeepDive>;
+  // "waiting": nothing to bet on yet (weather markets before the late-day readings), skipped
+  research: (event: MarketEvent) => Promise<DeepDive | "waiting">;
   // AI research is budgeted and re-checked at most every researchCooldownHours
   paid: boolean;
 };
@@ -136,6 +139,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
   });
 
   let researched = 0;
+  let waiting = 0;
   const failed: ScanReport["failed"] = [];
   const reviewed: ScanReport["reviewed"] = [];
   let proposed = 0;
@@ -153,6 +157,10 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
     const event = eligible.find((item) => item.id === eventId)!;
     try {
       const research = await researcher.research(event);
+      if (research === "waiting") {
+        waiting++;
+        continue;
+      }
       researched++;
       const current = await getBankroll(exchange);
 
@@ -232,6 +240,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
     open: events.length,
     eligible: eligible.length,
     researched,
+    waiting,
     proposed,
     placed: 0,
     reviewed,
