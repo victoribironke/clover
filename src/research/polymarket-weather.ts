@@ -60,10 +60,11 @@ const quantile = (sorted: number[], q: number) =>
 const localTime = (at: number, timeZone: string) =>
   new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(at);
 
+// "waiting": too early in the local day to bet, so nothing is fetched beyond the time zone
 export const polymarketWeather = async (
   event: MarketEvent,
   now = Date.now(),
-): Promise<DeepDive | null> => {
+): Promise<DeepDive | "waiting" | null> => {
   const question = parsePolymarketQuestion(event);
   if (!question) return null;
   const { kind, unit } = question;
@@ -75,6 +76,7 @@ export const polymarketWeather = async (
   const midnight = Date.parse(`${question.day}T00:00:00Z`);
   const start = midnight - offsetMinutesAt(timeZone, midnight + 12 * 3_600_000) * 60_000;
   const end = start + DAY;
+  if ((now - start) / 3_600_000 < LATE_HOUR[kind]) return "waiting";
   const recentDays = [1, 2, 3]
     .map((back) => ({ start: start - back * DAY, end: start - (back - 1) * DAY }))
     .filter((day) => day.end <= now)
