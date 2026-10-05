@@ -9,38 +9,22 @@ export const settings = {
   // `kinds`: the only market kinds (src/data/kind.ts) researched there; null = everything the
   // filters below allow. Weather only everywhere from 2026-10-03: Kalshi weather went 9 of 14
   // (+$73 on $100 paper) while everything else on Bayse lost.
-  // `maxBetFraction` / `minimumStakeFraction` override the defaults below. A $5 bankroll needs
-  // bigger fractions to place anything: Kalshi's smallest order is 1 contract (up to $0.99),
-  // Polymarket's is 5 shares ($2.50 at 50¢).
+  // `maxBetFraction` / `minimumStakeFraction` can override the defaults below, e.g. for a tiny
+  // bankroll: Kalshi's smallest order is 1 contract (up to $0.99), Polymarket's is 5 shares ($2.50
+  // at 50¢). At $50 the defaults fit both ($5 a bet at most, minimums up to $2.50).
   exchanges: {
     // NGN. Researched with AI (Gemini search + gpt-6-luna), plus the weather ensemble Data line.
     bayse: { enabled: true, dryRun: true, capital: 10_000, research: "ai", kinds: ["weather"] },
     // USD, paper only for now: no account is connected, it reads Kalshi's public market data
     // (from 2026-09-30). Daily US high/low temperature markets, priced from a weather-model
     // ensemble plus the settlement station's own readings, with no AI calls
-    // (src/research/weather-model.ts). Capital $100 until 2026-10-03, then $5.
-    kalshi: {
-      enabled: true,
-      dryRun: true,
-      capital: 5,
-      research: "weather-model",
-      kinds: ["weather"],
-      maxBetFraction: 0.2,
-      minimumStakeFraction: 0.2,
-    },
+    // (src/research/weather-model.ts). Capital $100 until 2026-10-03, $5 until 2026-10-05, then $50.
+    kalshi: { enabled: true, dryRun: true, capital: 50, research: "weather-model", kinds: ["weather"] },
     // USD, paper only for now (from 2026-10-03): public market data, no wallet connected. Daily
     // high/low temperature markets in ~50 cities, settled on an airport's hourly reports
-    // (src/research/weather-model.ts). Its 5-share minimum means a $5 bankroll can only buy
-    // outcomes priced up to 20¢ at these fractions ($1 a bet).
-    polymarket: {
-      enabled: true,
-      dryRun: true,
-      capital: 5,
-      research: "weather-model",
-      kinds: ["weather"],
-      maxBetFraction: 0.2,
-      minimumStakeFraction: 0.2,
-    },
+    // (src/research/polymarket-weather.ts). $5 until 2026-10-05, then $50: its 5-share minimum
+    // had limited $5 to outcomes priced up to 20¢; at $50 anything up to ~49¢ fits the $2.50 floor.
+    polymarket: { enabled: true, dryRun: true, capital: 50, research: "weather-model", kinds: ["weather"] },
   },
   // Muted: no per-bet Telegram messages. Problems are saved and everything is reported in one
   // daily summary (23:30 WAT). Your own /scan still answers. Set false to hear about every bet.
