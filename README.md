@@ -28,7 +28,7 @@ every 2h   Kalshi + Polymarket scan ─► settle ─► today's temperature mar
 - **Live data first.** Before research, the bot fetches hard data itself where it can: a 122-run weather-model ensemble for temperature markets, and public mirrors of the Spotify and Apple Music Nigeria charts. The research must report the current reading it based its estimate on, which is shown on every bet. Without a live reading, confidence is capped at low, so history alone rarely triggers a bet. Sports and post counts need one to be bet on at all (bookmaker odds for the line, or the count so far).
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
-- **Capital.** Each exchange has its own capital (`exchanges` in `src/settings.ts`): ₦10,000 on Bayse, $5 each (paper) on Kalshi and Polymarket. Small bankrolls get bigger per-bet fractions (`maxBetFraction`, `minimumStakeFraction` per exchange), or nothing would ever reach Kalshi's 1-contract or Polymarket's 5-share minimum. The bot never works with more; anything above is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
+- **Capital.** Each exchange has its own capital (`exchanges` in `src/settings.ts`): ₦10,000 on Bayse, $50 each (paper) on Kalshi and Polymarket, with the default limits (at most 10% a bet). An exchange can override `maxBetFraction` / `minimumStakeFraction` if a small bankroll can't reach its minimum order (Kalshi 1 contract, Polymarket 5 shares). The bot never works with more; anything above is profit it won't touch, shown as _withdrawable_ in `/status`. After losses, it keeps going with what's left.
 - **Research cost.** Every model call (Gemini and OpenAI) is priced from its token and search counts. Scans stop for the day at the daily budget. `/status` and every bet message show the spend.
 - **Before placing,** it re-checks that the market is still open and re-quotes. If the edge is gone, it skips the bet and tells you.
 
@@ -49,7 +49,7 @@ Polymarket's Gamma API (events and markets) and its CLOB order books are public:
 - **Settlement is the reports themselves.** The answer is the highest (or lowest) reading NOAA lists for the station's local day, in whole degrees (°F in the US, from hourly reports only; °C elsewhere). So the readings so far are exactly the answer so far. Reports come from [aviationweather.gov](https://aviationweather.gov), for any airport worldwide.
 - **Pricing** ([`src/research/polymarket-weather.ts`](src/research/polymarket-weather.ts)): the readings so far, plus the ensemble for the hours left, corrected by half the models' recent miss at that station.
 - **Bets only late in the day:** after 4 PM local for highs, after 10 PM for lows (an evening can still undercut a morning low).
-- **Quotes** walk the CLOB's asks with the 5% weather fee (`rate × shares × price × (1 − price)`). The smallest order is 5 shares, so on $5 only outcomes up to about 20¢ fit the $1-a-bet limit.
+- **Quotes** walk the CLOB's asks with the 5% weather fee (`rate × shares × price × (1 − price)`). The smallest order is 5 shares: on $50, outcomes up to about 49¢ fit the $2.50 minimum-stake rounding.
 
 Going live needs a funded account on each: Kalshi requires US residency; Polymarket needs a crypto wallet and signed orders. Neither is connected yet.
 
@@ -149,7 +149,7 @@ Both run on paper now: the bot reads their public market data and places no orde
 **Kalshi**
 
 1. Sign up at kalshi.com and complete identity verification (18+, ID document).
-2. Deposit about $5, using whatever method the app offers you. Check its minimum deposit.
+2. Deposit what you'll trade with (the bot's capital there is $50), using whatever method the app offers you. Check its minimum deposit.
 3. _Account Settings → Profile_ ([kalshi.com/account/profile](https://kalshi.com/account/profile)) → _API Keys → Create New API Key_ (the default Ed25519 type is fine).
 4. Save the **Key ID** and the **private key** (`.pem` file) at once: Kalshi shows the private key only once.
 5. GitHub secrets: `KALSHI_API_KEY_ID` (the Key ID) and `KALSHI_PRIVATE_KEY` (the whole `.pem` file, `BEGIN`/`END` lines included).
@@ -158,10 +158,10 @@ Both run on paper now: the bot reads their public market data and places no orde
 **Polymarket**
 
 1. Sign up at polymarket.com. Safest: with a fresh wallet (e.g. MetaMask) used only for the bot, holding only the bot's money.
-2. Deposit about $5 of USDC on the Polygon network (Polymarket converts it to pUSD, its trading dollar). Check the minimum and the network before sending.
+2. Deposit what you'll trade with (the bot's capital there is $50) in USDC on the Polygon network (Polymarket converts it to pUSD, its trading dollar). Check the minimum and the network before sending.
 3. GitHub secrets: `POLYMARKET_PRIVATE_KEY` (the wallet's private key) and `POLYMARKET_FUNDER_ADDRESS` (the wallet address on your Polymarket profile, which holds the funds). The CLOB API key, secret and passphrase are derived from the private key, so the bot creates them itself.
 
-**Then** live order placement gets connected (signed requests on Kalshi; signed orders plus one-time token approvals on Polymarket) and tested on Kalshi's demo, then with one minimum-size real order each. Nothing goes live until `dryRun: false` is set for that exchange in `src/settings.ts`, and bets are sized from the $5 capital whatever the wallet holds.
+**Then** live order placement gets connected (signed requests on Kalshi; signed orders plus one-time token approvals on Polymarket) and tested on Kalshi's demo, then with one minimum-size real order each. Nothing goes live until `dryRun: false` is set for that exchange in `src/settings.ts`, and bets are sized from the capital in `src/settings.ts` whatever the wallet holds.
 
 ## Layout
 
