@@ -38,13 +38,18 @@ const signed = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 // readings so far plus the weather-model ensemble for the rest of the day, corrected by how far the
 // models missed this station on the last two finished days (src/data/station-weather.ts).
 // Free, so every open event can be checked on every scan. Returns null for anything else.
-const kalshiWeather = async (event: MarketEvent, now = Date.now()): Promise<DeepDive | null> => {
+const kalshiWeather = async (
+  event: MarketEvent,
+  now = Date.now(),
+): Promise<DeepDive | "waiting" | null> => {
   const question = parseTemperatureQuestion(event);
   if (!question) return null;
 
   const station = await stationInfo(question.station);
   const offset = standardOffsetMinutes(station.timeZone, Number(question.day.slice(0, 4)));
   const { start, end } = climateDay(question.day, offset);
+  // too early to bet: skip the forecast and readings calls entirely (they cost rate limit, not money)
+  if ((now - start) / 3_600_000 < LATE_HOUR) return "waiting";
   // the last two finished climate days, for the bias
   const recentDays = [1, 2, 3]
     .map((back) => ({ start: start - back * DAY, end: start - (back - 1) * DAY }))
