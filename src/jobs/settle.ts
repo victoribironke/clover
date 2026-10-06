@@ -2,7 +2,7 @@ import { listBets, updateBet } from "@/db/bets.ts";
 import { EXCHANGE_LABELS, type Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
-import { betLink, escapeHtml, money } from "@/telegram/format.ts";
+import { betLink, escapeHtml, money, pickText } from "@/telegram/format.ts";
 import { notify } from "@/telegram/notify.ts";
 
 // Mark placed bets won/lost/void once their market resolves
@@ -31,7 +31,7 @@ export const runSettle = async (exchange: Exchange) => {
         settled++;
         const icon = status === "won" ? "🏆" : status === "lost" ? "❌" : "↩️";
         await notify(
-          `${icon} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)}: <b>${status}</b>\n` +
+          `${icon} ${betLink(bet)} → ${escapeHtml(pickText(bet))}: <b>${status}</b>\n` +
             `Stake ${money(bet.stake, bet.currency)} · P&L <b>${money(pnl, bet.currency)}</b>${bet.dryRun ? " <i>(paper)</i>" : ""}`,
         );
       }
