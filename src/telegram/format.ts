@@ -58,6 +58,13 @@ export const eventLink = (exchange: ExchangeName, eventId: string, title: string
 export const betLink = (bet: Pick<Bet, "exchange" | "eventId" | "eventTitle">) =>
   eventLink(bet.exchange, bet.eventId, bet.eventTitle);
 
+// What was bought, in full: "47° to 48° → Yes", not just "Yes". An event can hold many markets
+// (every temperature band is its own Yes/No market), so the outcome alone is ambiguous.
+export const pickText = (bet: Pick<Bet, "eventTitle" | "marketTitle" | "outcomeLabel">) =>
+  bet.marketTitle && bet.marketTitle !== bet.eventTitle
+    ? `${bet.marketTitle} → ${bet.outcomeLabel}`
+    : bet.outcomeLabel;
+
 export const proposalMessage = (bet: Bet, research: DeepDive) => {
   const sources = research.sources
     .slice(0, 4)
@@ -71,8 +78,7 @@ export const proposalMessage = (bet: Bet, research: DeepDive) => {
   return [
     `🎯 <b>New bet</b>${tag(bet)}`,
     betLink(bet),
-    bet.marketTitle !== bet.eventTitle ? `Market: ${escapeHtml(bet.marketTitle)}` : null,
-    `Pick: <b>${escapeHtml(bet.outcomeLabel)}</b>`,
+    `Pick: <b>${escapeHtml(pickText(bet))}</b>`,
     "",
     `Stake: <b>${money(bet.stake, bet.currency)}</b> at ${pct(bet.quotedPrice)} (market shows ${pct(bet.marketPrice)})`,
     `Our probability: <b>${pct(bet.probability)}</b> · confidence ${bet.confidence}`,
@@ -190,7 +196,7 @@ export const statusLine = (bet: Bet) => {
     failed: "⚠️",
   };
   const pnl = bet.pnl !== null ? ` · P&L ${money(bet.pnl, bet.currency)}` : "";
-  return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(bet.outcomeLabel)}</b> · ${money(bet.stake, bet.currency)} · ${bet.status}${pnl}${tag(bet)}`;
+  return `${icon[bet.status]} ${betLink(bet)} → <b>${escapeHtml(pickText(bet))}</b> · ${money(bet.stake, bet.currency)} · ${bet.status}${pnl}${tag(bet)}`;
 };
 
 // 📊 Late-price study: are prices near the end fair, which kinds void, and does trading after
@@ -282,7 +288,7 @@ export const dailySummaryMessage = ({
   );
   for (const bet of placed.slice(0, LIST_LIMIT)) {
     lines.push(
-      `• ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${money(bet.stake, c)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`,
+      `• ${betLink(bet)} → ${escapeHtml(pickText(bet))} · ${money(bet.stake, c)} at ${pct(bet.fillPrice ?? bet.quotedPrice)}`,
     );
   }
   lines.push(...more(placed.length), "");
@@ -292,7 +298,7 @@ export const dailySummaryMessage = ({
   );
   for (const bet of settled.slice(0, LIST_LIMIT)) {
     lines.push(
-      `${icon(bet)} ${betLink(bet)} → ${escapeHtml(bet.outcomeLabel)} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0, c)}`,
+      `${icon(bet)} ${betLink(bet)} → ${escapeHtml(pickText(bet))} · ${bet.status === "void" ? "refunded" : signedMoney(bet.pnl ?? 0, c)}`,
     );
   }
   lines.push(...more(settled.length), "");
