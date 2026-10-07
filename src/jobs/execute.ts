@@ -11,9 +11,7 @@ import { clearButtons, notify } from "@/telegram/notify.ts";
 const skip = async (bet: Bet, reason: string) => {
   await updateBet(bet.id, { status: "skipped", error: reason }, ["placing"]);
   await clearButtons(bet.telegramMessageId);
-  await notify(
-    `⏭️ Skipped ${betLink(bet)} → ${escapeHtml(pickText(bet))}\n${escapeHtml(reason)}`,
-  );
+  await notify(`⏭️ Skipped ${betLink(bet)} → ${escapeHtml(pickText(bet))}\n${escapeHtml(reason)}`);
 };
 
 // Re-check everything right before money moves: the market may have closed,
@@ -86,10 +84,9 @@ export const executeBet = async (exchange: Exchange, bet: Bet) => {
     // an order error is not retried: it's safer to miss a bet than to place it twice
     await updateBet(bet.id, { status: "failed", error: errorMessage(error) });
     await clearButtons(bet.telegramMessageId);
-    await notify(
-      failureMessage(`Could not place: ${bet.eventTitle} → ${pickText(bet)}`, error),
-      { level: "alert" },
-    );
+    await notify(failureMessage(`Could not place: ${bet.eventTitle} → ${pickText(bet)}`, error), {
+      level: "alert",
+    });
     log.error("bet failed", { betId: bet.id, error: errorMessage(error) });
   }
 };
