@@ -129,7 +129,12 @@ const inRange = (value: number, range: NonNullable<Market["range"]>) =>
   (range.min === null || value >= range.min) && (range.max === null || value <= range.max);
 
 // Share of runs inside the band (with the measurement spread above), pulled slightly off 0 and 1:
-// a model this coarse is never certain
+// a model this coarse is never certain. The pull is sized as if there were at least 100 runs: late
+// in the day only the readings decide (one value), and (inside + 0.5) / (1 + 1) gave every band,
+// even ones the readings had ruled out, 25%. Polymarket lost 27 of 28 bets that way (2026-10-07),
+// buying "impossible" bands at 10¢.
+const MIN_RUNS = 100;
+
 export const bandProbability = (
   values: number[],
   range: NonNullable<Market["range"]>,
@@ -142,7 +147,9 @@ export const bandProbability = (
       neighbourWeight * (Number(inRange(value - 1, range)) + Number(inRange(value + 1, range))),
     0,
   );
-  return (inside + 0.5) / (values.length + 1);
+  if (values.length === 0) return 0.5;
+  const runs = Math.max(values.length, MIN_RUNS);
+  return ((inside / values.length) * runs + 0.5) / (runs + 1);
 };
 
 export type Ensemble = { hours: number[]; runs: number[][] };
@@ -202,7 +209,8 @@ const getJson = <T>(url: string, headers?: Record<string, string>): Promise<T> =
       const response = await fetch(url, { headers, signal: AbortSignal.timeout(20_000) });
       if (response.ok) return (await response.json()) as T;
       const retryable = response.status === 429 || response.status >= 500;
-      if (!retryable || attempt >= 3) throw new Error(`${response.status} from ${new URL(url).host}`);
+      if (!retryable || attempt >= 3)
+        throw new Error(`${response.status} from ${new URL(url).host}`);
       await Bun.sleep(2000 * 2 ** attempt);
     }
   })();
