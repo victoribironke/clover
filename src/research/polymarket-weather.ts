@@ -4,6 +4,7 @@ import {
   ensembleHours,
   extremeBias,
   runsBetween,
+  type Ensemble,
 } from "@/data/station-weather.ts";
 import type { MarketEvent } from "@/exchanges/types.ts";
 import { slugDay } from "@/exchanges/polymarket/adapter.ts";
@@ -54,6 +55,21 @@ export const shown = (metar: Metar, unit: "C" | "F") =>
 const counted = (all: Metar[], unit: "C" | "F") =>
   unit === "F" ? all.filter((metar) => metar.type === "METAR") : all;
 
+// The latest reading minus what the runs (on average) had for that hour: added to the hours left,
+// it carries the station's real current temperature into the rest of the day
+export const anchorShift = (ensemble: Ensemble, reading: { at: number; f: number }) => {
+  if (ensemble.hours.length === 0 || ensemble.runs.length === 0) return 0;
+  let index = 0;
+  for (const [i, hour] of ensemble.hours.entries()) {
+    if (Math.abs(hour - reading.at) < Math.abs(ensemble.hours[index]! - reading.at)) index = i;
+  }
+  // too far from any forecast hour to compare
+  if (Math.abs(ensemble.hours[index]! - reading.at) > 90 * 60_000) return 0;
+  const modelled =
+    ensemble.runs.reduce((total, run) => total + run[index]!, 0) / ensemble.runs.length;
+  return reading.f - modelled;
+};
+
 const quantile = (sorted: number[], q: number) =>
   sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
 
@@ -100,8 +116,15 @@ export const polymarketWeather = async (
   const today = readings.filter((reading) => reading.at >= start);
   const observed = today.length > 0 ? pick(...today.map((reading) => reading.f)) : null;
   const from = today.length > 0 ? Math.max(start, now) : start;
+  // How far to shift the forecast for the hours left. Before any reading: the models' recent miss
+  // on the day's extreme (bias). Once readings exist: anchor to the latest one, so the evening
+  // continues from where the station actually is. The extreme's bias is a daytime-peak error;
+  // added to evening hours it pushed them past the high so far and made settled bands look open
+  // (London 21°C, Toronto 14°C on 2026-10-06: the market was 86-90% sure, the bot bet against).
+  const latestReading = today.at(-1);
+  const shift = latestReading ? anchorShift(ensemble, latestReading) : bias;
   const runs = runsBetween(ensemble, from, end).map((run) =>
-    run.map((value) => Math.round(value + bias)),
+    run.map((value) => Math.round(value + shift)),
   );
   const values = (
     runs.length > 0
