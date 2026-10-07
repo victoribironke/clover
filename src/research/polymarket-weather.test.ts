@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { MarketEvent } from "@/exchanges/types.ts";
-import { parsePolymarketQuestion, shown } from "./polymarket-weather.ts";
+import { anchorShift, parsePolymarketQuestion, shown } from "./polymarket-weather.ts";
 
 const event = (overrides: Partial<MarketEvent>) =>
   ({
@@ -40,4 +40,19 @@ test("readings show as the resolution source does: whole degrees", () => {
   // KLGA's T01780111 = 17.8°C = 64.04°F
   expect(shown({ at: 0, c: 17.8, type: "METAR" }, "F")).toBe(64);
   expect(shown({ at: 0, c: 17, type: "METAR" }, "C")).toBe(17);
+});
+
+test("the forecast for the hours left is anchored to the latest reading", () => {
+  const hour = 3_600_000;
+  const ensemble = {
+    hours: [0, hour, 2 * hour],
+    runs: [
+      [20, 21, 19],
+      [22, 23, 21],
+    ],
+  };
+  // at 1h the runs average 22; the station reads 20, so the rest of the day shifts down by 2
+  expect(anchorShift(ensemble, { at: hour + 5 * 60_000, f: 20 })).toBe(-2);
+  // nothing to compare with
+  expect(anchorShift(ensemble, { at: 10 * hour, f: 20 })).toBe(0);
 });
