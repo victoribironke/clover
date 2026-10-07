@@ -138,8 +138,15 @@ describe("observedExtreme", () => {
 test("bandProbability counts runs in the band, never exactly 0 or 1", () => {
   const values = [74, 75, 76, 76, 77, 80];
   // 75 and 76 count 0.8 each plus 0.1 for a neighbour inside; 74 and 77 lend 0.1 from outside:
-  // 0.1 + 0.9 + 0.9 + 0.9 + 0.1 = 2.9 of 6 runs
-  expect(bandProbability(values, { min: 75, max: 76 })).toBeCloseTo(3.4 / 7);
-  expect(bandProbability(values, { min: 83, max: null })).toBeCloseTo(0.5 / 7);
-  expect(bandProbability(values, { min: null, max: 90 })).toBeCloseTo(6.5 / 7);
+  // 0.1 + 0.9 + 0.9 + 0.9 + 0.1 = 2.9 of 6 runs, smoothed as if there were 100
+  expect(bandProbability(values, { min: 75, max: 76 })).toBeCloseTo(((2.9 / 6) * 100 + 0.5) / 101);
+  expect(bandProbability(values, { min: 83, max: null })).toBeCloseTo(0.5 / 101);
+  expect(bandProbability(values, { min: null, max: 90 })).toBeCloseTo(100.5 / 101);
+});
+
+test("late in the day one value decides: other bands stay near 0 (not 25%)", () => {
+  // Wuhan's low at 11 PM: the readings say 14°C and no forecast hours are left
+  expect(bandProbability([14], { min: 12, max: 12 }, 0.03)).toBeLessThan(0.01);
+  expect(bandProbability([14], { min: 13, max: 13 }, 0.03)).toBeLessThan(0.04);
+  expect(bandProbability([14], { min: 14, max: 14 }, 0.03)).toBeGreaterThan(0.9);
 });
