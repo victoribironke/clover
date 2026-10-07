@@ -19,12 +19,24 @@ export const settings = {
     // (from 2026-09-30). Daily US high/low temperature markets, priced from a weather-model
     // ensemble plus the settlement station's own readings, with no AI calls
     // (src/research/weather-model.ts). Capital $100 until 2026-10-03, $5 until 2026-10-05, then $50.
-    kalshi: { enabled: true, dryRun: true, capital: 50, research: "weather-model", kinds: ["weather"] },
+    kalshi: {
+      enabled: true,
+      dryRun: true,
+      capital: 50,
+      research: "weather-model",
+      kinds: ["weather"],
+    },
     // USD, paper only for now (from 2026-10-03): public market data, no wallet connected. Daily
     // high/low temperature markets in ~50 cities, settled on an airport's hourly reports
     // (src/research/polymarket-weather.ts). $5 until 2026-10-05, then $50: its 5-share minimum
     // had limited $5 to outcomes priced up to 20¢; at $50 anything up to ~49¢ fits the $2.50 floor.
-    polymarket: { enabled: true, dryRun: true, capital: 50, research: "weather-model", kinds: ["weather"] },
+    polymarket: {
+      enabled: true,
+      dryRun: true,
+      capital: 50,
+      research: "weather-model",
+      kinds: ["weather"],
+    },
   },
   // Muted: no per-bet Telegram messages. Problems are saved and everything is reported in one
   // daily summary (23:30 WAT). Your own /scan still answers. Set false to hear about every bet.
@@ -84,8 +96,10 @@ export const settings = {
   // hour); on Kalshi it means the station's readings after the day's peak (src/research/weather-model.ts).
   liveReadingRequiredKinds: ["sports", "post-count", "weather"],
   // Never buy an outcome priced below this: long shots like "0-0 draw" at 5% were ₦100 lottery
-  // tickets let through by minimum-stake rounding (from 2026-09-30)
-  minOutcomePrice: 0.1,
+  // tickets let through by minimum-stake rounding (from 2026-09-30). Raised from 10¢ to 20¢ on
+  // 2026-10-07: in the week to then, Kalshi bets under 20¢ won 3 of 28 (-17%) and Polymarket's
+  // 10-15¢ bets 1 of 27, while Kalshi's 20-60¢ bets returned +25% to +79%.
+  minOutcomePrice: 0.2,
   // only consider events that resolve within this many hours (7 days), so capital isn't tied up for long
   maxHoursToResolve: 168,
   // trading must stay open at least this long: the cancel window plus a margin to place the bet
