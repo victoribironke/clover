@@ -36,7 +36,11 @@ const fetchRaw = (icao: string, hours: number) => {
       signal: AbortSignal.timeout(20_000),
     });
     // reads: back off and retry on rate limits and server errors
-    for (let attempt = 0; !response.ok && (response.status === 429 || response.status >= 500) && attempt < 3; attempt++) {
+    for (
+      let attempt = 0;
+      !response.ok && (response.status === 429 || response.status >= 500) && attempt < 3;
+      attempt++
+    ) {
       await Bun.sleep(2000 * 2 ** attempt);
       response = await fetch(url, {
         headers: { "User-Agent": "clover-bot (prediction market research)" },
