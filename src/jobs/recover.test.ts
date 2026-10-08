@@ -8,6 +8,7 @@ const messages: string[] = [];
 
 mock.module("@/db/bets.ts", () => ({
   listBets: async (statuses: string[]) => bets.filter((bet) => statuses.includes(bet.status)),
+  betTotals: async () => ({ exposure: 0, realizedPnl: 0, unsent: 0 }),
   updateBet: async (id: string, patch: Partial<Bet>, fromStatuses?: string[]) => {
     const bet = bets.find((item) => item.id === id);
     if (!bet || (fromStatuses && !fromStatuses.includes(bet.status))) return false;
