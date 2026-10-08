@@ -124,3 +124,26 @@ test("quote picks the opposite side's bids", async () => {
   const yes = await exchange.quote({ eventId: "E", marketId: "M", outcomeId: "M:yes", amount: 2 });
   expect(yes.avgPrice).toBeLessThan(0.12);
 });
+
+test("snapshot quotes reuse one order-book read for several stake sizes", async () => {
+  let reads = 0;
+  const exchange = createKalshiExchange({
+    baseUrl: "",
+    series: [],
+    fetchJson: async <T>() => {
+      reads++;
+      return {
+        orderbook_fp: { no_dollars: [["0.7000", "50.00"]] },
+      } as T;
+    },
+  });
+  const requests = [2, 1].map((amount) => ({
+    eventId: "E",
+    marketId: "M",
+    outcomeId: "M:yes",
+    amount,
+  }));
+  const quotes = await exchange.quoteMany!(requests);
+  expect(quotes).toHaveLength(2);
+  expect(reads).toBe(1);
+});
