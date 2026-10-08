@@ -1,4 +1,4 @@
-import { betTotals } from "@/db/bets.ts";
+import { betTotals, type BetTotals } from "@/db/bets.ts";
 import { isDryRun } from "@/exchanges/mode.ts";
 import type { Currency, Exchange, ExchangeName } from "@/exchanges/types.ts";
 import { settings } from "@/settings.ts";
@@ -24,10 +24,13 @@ export type Bankroll = {
 // Capital rule: on each exchange the bot only ever works with that exchange's capital
 // (settings.exchanges). Anything above it is profit that is left alone for withdrawal; after
 // losses it works with what's left. In dry-run mode the wallet is simulated as capital + paper P&L.
-export const getBankroll = async (exchange: Exchange): Promise<Bankroll> => {
+export const getBankroll = async (
+  exchange: Exchange,
+  knownTotals?: BetTotals,
+): Promise<Bankroll> => {
   const capital = settings.exchanges[exchange.name].capital;
   const dryRun = isDryRun(exchange);
-  const { exposure, realizedPnl, unsent } = await betTotals(exchange.name, dryRun);
+  const { exposure, realizedPnl, unsent } = knownTotals ?? (await betTotals(exchange.name, dryRun));
 
   // In live mode the wallet balance already has placed stakes deducted, but not
   // pending ones (they haven't been sent yet), so subtract those separately.
@@ -50,5 +53,19 @@ export const getBankroll = async (exchange: Exchange): Promise<Bankroll> => {
     withdrawable,
     realizedPnl,
     dryRun,
+  };
+};
+
+// A same-exchange scan holds a lock, so after it creates a pending bet it can reserve that stake
+// in memory instead of downloading the complete bet history again. Concurrent cancellation can
+// only make this conservative (less capital used), never let the scan overcommit.
+export const reserveBankroll = (bankroll: Bankroll, stake: number): Bankroll => {
+  const available = Math.max(0, bankroll.available - stake);
+  const exposure = bankroll.exposure + stake;
+  return {
+    ...bankroll,
+    available,
+    exposure,
+    deployable: Math.max(0, Math.min(available, bankroll.bankroll - exposure)),
   };
 };
