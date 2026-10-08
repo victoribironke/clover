@@ -59,10 +59,22 @@ export const startServer = () =>
           if (names.length === 1) {
             return runJob(`scan ${name}`, () => runScanAndReport(getExchange(names[0]!), options));
           }
-          // each scan reports (or reports its failure) itself; one failing doesn't stop the others
-          return runJob(`scan ${names.join(",")}`, () =>
-            Promise.allSettled(names.map((each) => runScanAndReport(getExchange(each), options))),
-          );
+          // Weather providers rate-limit bursts. Run exchanges in order, while still reporting
+          // each failure independently so one exchange never prevents the next from scanning.
+          return runJob(`scan ${names.join(",")}`, async () => {
+            const results: PromiseSettledResult<unknown>[] = [];
+            for (const each of names) {
+              try {
+                results.push({
+                  status: "fulfilled",
+                  value: await runScanAndReport(getExchange(each), options),
+                });
+              } catch (reason) {
+                results.push({ status: "rejected", reason });
+              }
+            }
+            return results;
+          });
         },
       },
       "/jobs/study": {
