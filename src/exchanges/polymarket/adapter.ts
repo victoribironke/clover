@@ -326,6 +326,21 @@ export const createPolymarketExchange = ({
     return walkAsks(book.asks, amount, token.feeRate, token.minShares);
   };
 
+  const quoteMany: NonNullable<Exchange["quoteMany"]> = async (requests) => {
+    if (requests.length === 0) return [];
+    const first = requests[0]!;
+    if (requests.some((request) => request.outcomeId !== first.outcomeId)) {
+      throw new Error("Polymarket snapshot quotes must use one outcome token");
+    }
+    const book = await get<RawBook>(
+      `${clobUrl}/book?token_id=${encodeURIComponent(first.outcomeId)}`,
+    );
+    const token = tokens.get(first.outcomeId) ?? { minShares: 5, feeRate: 0.05 };
+    return requests.map((request) =>
+      walkAsks(book.asks, request.amount, token.feeRate, token.minShares),
+    );
+  };
+
   const unsupported = () =>
     Promise.reject(new Error("Polymarket: the late-price study only runs on Bayse"));
 
@@ -337,6 +352,7 @@ export const createPolymarketExchange = ({
     listOpenEvents,
     getEvent,
     quote,
+    quoteMany,
     placeOrder: paperOnly,
     findOrders: paperOnly,
     getAvailableBalance: paperOnly,
