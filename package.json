@@ -9,9 +9,9 @@
     "scan": "bun src/cli.ts scan",
     "tick": "bun src/cli.ts tick",
     "markets": "bun src/cli.ts markets",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun node_modules/typescript/bin/tsc --noEmit",
     "test": "bun test",
-    "format": "prettier --write ."
+    "format": "bun node_modules/prettier/bin/prettier.cjs --write ."
   },
   "dependencies": {
     "@google-cloud/firestore": "^9.2.0",
