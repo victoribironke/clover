@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   bandRange,
+  createPolymarketExchange,
   isStationTemperature,
   slugDay,
   toEvent,
@@ -108,4 +109,25 @@ describe("walkAsks", () => {
     expect(quote.shares).toBe(0);
     expect(quote.completeFill).toBe(false);
   });
+});
+
+test("snapshot quotes reuse one order-book read for several stake sizes", async () => {
+  let reads = 0;
+  const exchange = createPolymarketExchange({
+    gammaUrl: "",
+    clobUrl: "",
+    fetchJson: async <T>() => {
+      reads++;
+      return { asks: [{ price: "0.40", size: "100" }] } as T;
+    },
+  });
+  const requests = [4, 3].map((amount) => ({
+    eventId: "E",
+    marketId: "M",
+    outcomeId: "yes-token",
+    amount,
+  }));
+  const quotes = await exchange.quoteMany!(requests);
+  expect(quotes).toHaveLength(2);
+  expect(reads).toBe(1);
 });
