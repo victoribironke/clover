@@ -17,7 +17,7 @@ import { deepDive, type DeepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
 import { weatherModel } from "@/research/weather-model.ts";
 import { settings } from "@/settings.ts";
-import { getBankroll } from "@/strategy/bankroll.ts";
+import { getBankroll, reserveBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
 import { proposeBet, type NearMiss } from "@/strategy/propose.ts";
 import {
@@ -80,7 +80,7 @@ const skipped = (exchange: ExchangeName, skippedReason: string): ScanReport => (
 type Researcher = {
   pick: (eligible: MarketEvent[]) => Promise<string[]>;
   // "waiting": nothing to bet on yet (weather markets before the late-day readings), skipped
-  research: (event: MarketEvent) => Promise<DeepDive | "waiting">;
+  research: (event: MarketEvent, now: number) => Promise<DeepDive | "waiting">;
   // AI research is budgeted and re-checked at most every researchCooldownHours
   paid: boolean;
 };
@@ -88,7 +88,7 @@ type Researcher = {
 const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
   ai: {
     pick: (eligible) => triageEvents(eligible, settings.maxDeepDivesPerScan),
-    research: deepDive,
+    research: (event) => deepDive(event),
     paid: true,
   },
   "weather-model": {
@@ -100,8 +100,8 @@ const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
         .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 36 * HOUR)
         .sort((a, b) => (a.closingDate ?? "").localeCompare(b.closingDate ?? ""))
         .map((event) => event.id),
-    research: async (event) => {
-      const research = await weatherModel(event);
+    research: async (event, now) => {
+      const research = await weatherModel(event, now);
       if (!research) throw new Error("Not a temperature market the weather model can read");
       return research;
     },
@@ -113,7 +113,7 @@ const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
 // capital, budget spent) only skip research; the scan still does its bookkeeping and placing.
 const researchAndPropose = async (exchange: Exchange, startedAt: number): Promise<ScanReport> => {
   const researcher = RESEARCHERS[settings.exchanges[exchange.name].research];
-  const bankroll = await getBankroll(exchange);
+  let bankroll = await getBankroll(exchange);
   if (bankroll.deployable <= 0) {
     return skipped(exchange.name, "no free capital");
   }
@@ -143,7 +143,29 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
   const failed: ScanReport["failed"] = [];
   const reviewed: ScanReport["reviewed"] = [];
   let proposed = 0;
-  for (const eventId of picked) {
+  const eventById = new Map(eligible.map((event) => [event.id, event]));
+  type ResearchAttempt = { ok: true; value: DeepDive | "waiting" } | { ok: false; error: unknown };
+  const prefetched = new Map<string, Promise<ResearchAttempt>>();
+  const researchAt = Date.now();
+  const startWeatherResearch = (index: number) => {
+    if (researcher.paid || index >= picked.length) return;
+    const eventId = picked[index]!;
+    const event = eventById.get(eventId)!;
+    if (prefetched.has(eventId)) return;
+    prefetched.set(
+      eventId,
+      researcher
+        .research(event, researchAt)
+        .then((value): ResearchAttempt => ({ ok: true, value }))
+        .catch((error): ResearchAttempt => ({ ok: false, error })),
+    );
+  };
+  // Two requests overlap, enough to hide latency without recreating the provider bursts that
+  // caused 429s. Research and proposal processing then run as a small pipeline.
+  startWeatherResearch(0);
+  startWeatherResearch(1);
+
+  for (const [index, eventId] of picked.entries()) {
     if (Date.now() - startedAt > SCAN_DEADLINE) {
       log.warn("scan deadline reached", { researched });
       break;
@@ -152,25 +174,32 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       log.warn("daily research budget reached", { budget: settings.dailyResearchBudgetUsd });
       break;
     }
-    // earlier proposals in this scan may have used up the capital; don't pay for research we can't bet on
-    if ((await getBankroll(exchange)).deployable <= 0) break;
-    const event = eligible.find((item) => item.id === eventId)!;
+    // Earlier proposals in this same locked scan reserve their stake in this snapshot. A concurrent
+    // cancellation may free money, but staying conservative is cheaper than rereading all history.
+    if (bankroll.deployable <= 0) break;
+    const event = eventById.get(eventId)!;
     try {
-      const research = await researcher.research(event);
+      const attempt = researcher.paid
+        ? await researcher
+            .research(event, researchAt)
+            .then((value): ResearchAttempt => ({ ok: true, value }))
+            .catch((error): ResearchAttempt => ({ ok: false, error }))
+        : await prefetched.get(eventId)!;
+      startWeatherResearch(index + 2);
+      if (!attempt.ok) throw attempt.error;
+      const research = attempt.value;
       if (research === "waiting") {
         waiting++;
         continue;
       }
       researched++;
-      const current = await getBankroll(exchange);
-
       // re-read prices: research can take minutes and the market may have moved
       const fresh = await exchange.getEvent(event.id);
       const { proposal, nearMiss } = await proposeBet(
         exchange,
         fresh,
         research.estimates,
-        current,
+        bankroll,
         research.liveData,
       );
       // free research checks every event on every scan: only keep the ones that led to a bet
@@ -222,6 +251,7 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
         dryRun: isDryRun(exchange),
         executeAt: new Date(Date.now() + settings.cancelWindowMinutes * 60_000).toISOString(),
       });
+      bankroll = reserveBankroll(bankroll, bet.stake);
       const messageId = await notify(proposalMessage(bet, research), {
         keyboard: betKeyboard(bet.id),
       });
@@ -234,6 +264,10 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       if (isGeminiUnavailable(error) || isOpenAiUnavailable(error)) break;
     }
   }
+
+  // If a deadline or exhausted bankroll stopped the proposal loop, keep the request alive until
+  // the at-most-two already-started reads finish; Cloud Run must not leave background work behind.
+  await Promise.all(prefetched.values());
 
   return {
     exchange: exchange.name,
