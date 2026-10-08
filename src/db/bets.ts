@@ -167,8 +167,11 @@ export type BetTotals = {
   unsent: number;
 };
 
-export const betTotals = async (exchange: ExchangeName, dryRun: boolean): Promise<BetTotals> => {
-  const all = await listBets([...LIVE, ...SETTLED], 10_000);
+export const betTotalsFromBets = (
+  all: Bet[],
+  exchange: ExchangeName,
+  dryRun: boolean,
+): BetTotals => {
   const mine = all.filter((bet) => bet.exchange === exchange && bet.dryRun === dryRun);
   const sum = (items: Bet[], pick: (bet: Bet) => number) =>
     items.reduce((total, bet) => total + pick(bet), 0);
@@ -186,4 +189,9 @@ export const betTotals = async (exchange: ExchangeName, dryRun: boolean): Promis
       (bet) => bet.stake,
     ),
   };
+};
+
+export const betTotals = async (exchange: ExchangeName, dryRun: boolean): Promise<BetTotals> => {
+  const all = await listBets([...LIVE, ...SETTLED], 10_000);
+  return betTotalsFromBets(all, exchange, dryRun);
 };
