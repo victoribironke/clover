@@ -274,8 +274,11 @@ export const stationReadings = async (
   start: number,
   end: number,
 ): Promise<Reading[]> => {
+  // All events in a scan share one timestamp, but rounding also lets a city's high/low coalesce
+  // when called independently a few milliseconds apart. The local filter below preserves `end`.
+  const requestEnd = Math.ceil(end / 60_000) * 60_000;
   let url: string | undefined =
-    `https://api.weather.gov/stations/${icao}/observations?start=${new Date(start).toISOString()}&end=${new Date(end).toISOString()}`;
+    `https://api.weather.gov/stations/${icao}/observations?start=${new Date(start).toISOString()}&end=${new Date(requestEnd).toISOString()}`;
   const readings: Reading[] = [];
   for (let page = 0; url && page < 8; page++) {
     const data: ObservationsPage = await getJson<ObservationsPage>(url, NWS_HEADERS);
