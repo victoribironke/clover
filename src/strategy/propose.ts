@@ -68,20 +68,37 @@ const priceStake = async (
   minStake: number,
   step: number,
 ): Promise<Priced> => {
-  let stake = initialStake;
+  const stakes: number[] = [];
+  let nextStake = initialStake;
+  for (let attempt = 0; attempt < QUOTE_ATTEMPTS && nextStake >= minStake - 1e-9; attempt++) {
+    stakes.push(nextStake);
+    nextStake = Math.floor(nextStake / 2 / step) * step;
+  }
+  const snapshot = exchange.quoteMany
+    ? await exchange.quoteMany(
+        stakes.map((amount) => ({
+          eventId: event.id,
+          marketId: market.id,
+          outcomeId: outcome.id,
+          amount,
+        })),
+      )
+    : null;
   let last: Priced = {
     ok: false,
     quotedPrice: outcome.price,
     expectedReturn: 0,
     reason: "no quote",
   };
-  for (let attempt = 0; attempt < QUOTE_ATTEMPTS && stake >= minStake - 1e-9; attempt++) {
-    const quote = await exchange.quote({
-      eventId: event.id,
-      marketId: market.id,
-      outcomeId: outcome.id,
-      amount: stake,
-    });
+  for (const [index, stake] of stakes.entries()) {
+    const quote =
+      snapshot?.[index] ??
+      (await exchange.quote({
+        eventId: event.id,
+        marketId: market.id,
+        outcomeId: outcome.id,
+        amount: stake,
+      }));
     const edge = expectedReturn(probability, quote.avgPrice);
     if (quote.completeFill && edge >= settings.minEdge) {
       return { ok: true, stake, quotedPrice: quote.avgPrice, expectedReturn: edge };
@@ -94,7 +111,6 @@ const priceStake = async (
         ? `fees and price impact eat the edge (needs ${needs})`
         : "not enough liquidity",
     };
-    stake = Math.floor(stake / 2 / step) * step;
   }
   return last;
 };
@@ -109,6 +125,17 @@ export const proposeBet = async (
 ): Promise<Verdict> => {
   const candidates: Proposal[] = [];
   const misses: NearMiss[] = [];
+  const toPrice: {
+    market: Market;
+    outcome: Outcome;
+    modelProbability: number;
+    probability: number;
+    confidence: Confidence;
+    stake: number;
+    minStake: number;
+    listedEdge: number;
+    miss: (price: number, edge: number, reason: string) => void;
+  }[] = [];
   const kind = marketKind(event);
   const blocked =
     !liveData && (settings.liveReadingRequiredKinds as readonly string[]).includes(kind);
@@ -180,36 +207,61 @@ export const proposeBet = async (
         continue;
       }
 
-      try {
-        const step = bankroll.currency === "USD" ? 0.01 : 1;
-        const priced = await priceStake(
-          exchange,
-          event,
-          market,
-          outcome,
-          probability,
-          stake,
-          minStake,
-          step,
-        );
-        if (!priced.ok) {
-          miss(priced.quotedPrice, priced.expectedReturn, priced.reason);
-          continue;
-        }
-        candidates.push({
-          market,
-          outcome,
-          modelProbability,
-          probability,
-          confidence: estimate.confidence,
-          stake: priced.stake,
-          quotedPrice: priced.quotedPrice,
-          expectedReturn: priced.expectedReturn,
-          expectedProfit: priced.stake * priced.expectedReturn,
-        });
-      } catch (error) {
-        miss(outcome.price, listedEdge, `quote failed: ${describeError(error).message}`);
+      toPrice.push({
+        market,
+        outcome,
+        modelProbability,
+        probability,
+        confidence: estimate.confidence,
+        stake,
+        minStake,
+        listedEdge,
+        miss,
+      });
+    }
+  }
+
+  // One bet can win per event, so price the strongest upper bound first. A live buy quote can only
+  // be as good as the freshly listed ask; once a completed candidate beats every remaining
+  // stake × listed-edge bound, more order-book calls cannot change the winner.
+  toPrice.sort((a, b) => b.stake * b.listedEdge - a.stake * a.listedEdge);
+  let bestProfit = 0;
+  for (const candidate of toPrice) {
+    if (bestProfit >= candidate.stake * candidate.listedEdge) break;
+    try {
+      const priced = await priceStake(
+        exchange,
+        event,
+        candidate.market,
+        candidate.outcome,
+        candidate.probability,
+        candidate.stake,
+        candidate.minStake,
+        bankroll.currency === "USD" ? 0.01 : 1,
+      );
+      if (!priced.ok) {
+        candidate.miss(priced.quotedPrice, priced.expectedReturn, priced.reason);
+        continue;
       }
+      const expectedProfit = priced.stake * priced.expectedReturn;
+      bestProfit = Math.max(bestProfit, expectedProfit);
+      candidates.push({
+        market: candidate.market,
+        outcome: candidate.outcome,
+        modelProbability: candidate.modelProbability,
+        probability: candidate.probability,
+        confidence: candidate.confidence,
+        stake: priced.stake,
+        quotedPrice: priced.quotedPrice,
+        expectedReturn: priced.expectedReturn,
+        expectedProfit,
+      });
+    } catch (error) {
+      candidate.miss(
+        candidate.outcome.price,
+        candidate.listedEdge,
+        `quote failed: ${describeError(error).message}`,
+      );
     }
   }
 
