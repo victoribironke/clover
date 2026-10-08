@@ -20,6 +20,16 @@ const every = (minutes: number, name: string, job: () => Promise<unknown>) => {
   return run;
 };
 
+// Local weather timers can fire together. Keep the exchange scans in one queue so their shared
+// NOAA/Open-Meteo providers see a steady request stream rather than two simultaneous bursts.
+let weatherScanTail: Promise<unknown> = Promise.resolve();
+const queueWeatherScan = (job: () => Promise<unknown>) => {
+  const run = weatherScanTail.then(job);
+  // Keep the queue usable after a failure; `every` logs the rejected `run` once.
+  weatherScanTail = run.catch(() => undefined);
+  return run;
+};
+
 // Cloud Run sends SIGTERM (then ~10s grace) when it replaces or recycles an instance, e.g. on
 // every deploy. Work in progress dies with the process, so hand back its locks and say so,
 // instead of leaving a stale lock that blocks the next scan.
@@ -73,11 +83,13 @@ const main = async () => {
       every(settings.scanEveryMinutes, "scan bayse", () => runScanAndReport(bayse))();
     }
     if (exchanges.includes(kalshi)) {
-      every(settings.kalshiScanEveryMinutes, "scan kalshi", () => runScanAndReport(kalshi))();
+      every(settings.kalshiScanEveryMinutes, "scan kalshi", () =>
+        queueWeatherScan(() => runScanAndReport(kalshi)),
+      )();
     }
     if (exchanges.includes(polymarket)) {
       every(settings.polymarketScanEveryMinutes, "scan polymarket", () =>
-        runScanAndReport(polymarket),
+        queueWeatherScan(() => runScanAndReport(polymarket)),
       )();
     }
     every(settings.studyEveryMinutes, "study", () => runStudy(bayse))();
