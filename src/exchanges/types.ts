@@ -112,6 +112,10 @@ export type Exchange = {
   listOpenEvents: () => Promise<MarketEvent[]>;
   getEvent: (eventId: string) => Promise<MarketEvent>;
   quote: (request: QuoteRequest) => Promise<Quote>;
+  // Optional snapshot quote for several sizes of the same outcome. Public CLOB adapters use one
+  // order-book read for proposal sizing; execution still calls `quote` again immediately before
+  // placing, so it never relies on this earlier snapshot.
+  quoteMany?: (requests: QuoteRequest[]) => Promise<Quote[]>;
   placeOrder: (request: OrderRequest) => Promise<PlacedOrder>;
   // our BUY orders that actually bought something (filled, partly filled, or resting on the book)
   findOrders: (query: OrderQuery) => Promise<PlacedOrder[]>;
