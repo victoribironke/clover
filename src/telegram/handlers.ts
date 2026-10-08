@@ -1,12 +1,12 @@
 import { config } from "@/config.ts";
-import { ALL_STATUSES, getBet, listBets, updateBet } from "@/db/bets.ts";
+import { ALL_STATUSES, betTotalsFromBets, getBet, listBets, updateBet } from "@/db/bets.ts";
 import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchanges, getExchange, isDryRun } from "@/exchanges/index.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
-import { buildDailySummary } from "@/jobs/summary.ts";
+import { buildDailySummaries } from "@/jobs/summary.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { selfOrigin } from "@/lib/self.ts";
 import { settings } from "@/settings.ts";
@@ -38,11 +38,16 @@ export const registerHandlers = () => {
 
   // one message per exchange, each in its own currency
   bot.command("status", async (ctx) => {
-    const [paused, today, month] = await Promise.all([isPaused(), spendToday(), spendThisMonth()]);
+    const [paused, today, month, bets] = await Promise.all([
+      isPaused(),
+      spendToday(),
+      spendThisMonth(),
+      listBets(ALL_STATUSES, 10_000),
+    ]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
     for (const exchange of exchanges) {
       const [bankroll, wallet] = await Promise.all([
-        getBankroll(exchange),
+        getBankroll(exchange, betTotalsFromBets(bets, exchange.name, isDryRun(exchange))),
         // read live; an exchange hiccup shouldn't stop /status from answering
         exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
       ]);
@@ -51,8 +56,8 @@ export const registerHandlers = () => {
   });
 
   bot.command("summary", async (ctx) => {
-    for (const [index, exchange] of exchanges.entries()) {
-      await ctx.reply(await buildDailySummary(exchange, { shared: index === 0 }), {
+    for (const message of await buildDailySummaries(exchanges)) {
+      await ctx.reply(message, {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
       });
