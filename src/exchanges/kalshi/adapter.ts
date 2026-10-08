@@ -258,12 +258,33 @@ export const createKalshiExchange = ({
     return toEvent(result.event, markets);
   };
 
-  const quote: Exchange["quote"] = async ({ marketId, outcomeId, amount }) => {
+  const loadBook = async (marketId: string) => {
     const { orderbook_fp: book } = await get<RawOrderbook>(
       `/markets/${encodeURIComponent(marketId)}/orderbook`,
     );
+    return book;
+  };
+
+  const quote: Exchange["quote"] = async ({ marketId, outcomeId, amount }) => {
+    const book = await loadBook(marketId);
     const buyingYes = outcomeId.endsWith(":yes");
     return walkBook((buyingYes ? book?.no_dollars : book?.yes_dollars) ?? [], amount, feeRate);
+  };
+
+  const quoteMany: NonNullable<Exchange["quoteMany"]> = async (requests) => {
+    if (requests.length === 0) return [];
+    const first = requests[0]!;
+    if (
+      requests.some(
+        (request) => request.marketId !== first.marketId || request.outcomeId !== first.outcomeId,
+      )
+    ) {
+      throw new Error("Kalshi snapshot quotes must use one market outcome");
+    }
+    const book = await loadBook(first.marketId);
+    const buyingYes = first.outcomeId.endsWith(":yes");
+    const bids = (buyingYes ? book?.no_dollars : book?.yes_dollars) ?? [];
+    return requests.map((request) => walkBook(bids, request.amount, feeRate));
   };
 
   const unsupported = () =>
@@ -277,6 +298,7 @@ export const createKalshiExchange = ({
     listOpenEvents,
     getEvent,
     quote,
+    quoteMany,
     placeOrder: paperOnly,
     findOrders: paperOnly,
     getAvailableBalance: paperOnly,
