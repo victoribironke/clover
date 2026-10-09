@@ -5,6 +5,7 @@ import { spendToday } from "@/db/spend.ts";
 import { isDryRun } from "@/exchanges/mode.ts";
 import type { Exchange } from "@/exchanges/types.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
+import { within } from "@/lib/within.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { dailySummaryMessage } from "@/telegram/format.ts";
 import { notify } from "@/telegram/notify.ts";
@@ -36,7 +37,7 @@ export const buildDailySummary = async (
   const dryRun = isDryRun(exchange);
   const [bankroll, wallet, spent, deepDives, alerts] = await Promise.all([
     getBankroll(exchange, betTotalsFromBets(bets, exchange.name, dryRun)),
-    exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
+    exchange.canTrade ? within(exchange.getWallet(), 5_000, null) : Promise.resolve(null),
     shared ? spendToday() : Promise.resolve(0),
     shared ? countAnalysesSince(sinceIso) : Promise.resolve(0),
     shared ? alertsSince(since) : Promise.resolve([]),
