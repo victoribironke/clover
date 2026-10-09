@@ -36,7 +36,7 @@ ${
 export const registerHandlers = () => {
   bot.command(["start", "help"], (ctx) => ctx.reply(HELP, { parse_mode: "HTML" }));
 
-  // one message per exchange, each in its own currency
+  // One reply with a section per exchange, each in its own currency.
   bot.command("status", async (ctx) => {
     const [paused, today, month, bets] = await Promise.all([
       isPaused(),
@@ -45,14 +45,17 @@ export const registerHandlers = () => {
       listBets(ALL_STATUSES, 10_000),
     ]);
     const spend = { today, month, dailyBudget: settings.dailyResearchBudgetUsd };
-    for (const exchange of exchanges) {
-      const [bankroll, wallet] = await Promise.all([
-        getBankroll(exchange, betTotalsFromBets(bets, exchange.name, isDryRun(exchange))),
-        // read live; an exchange hiccup shouldn't stop /status from answering
-        exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
-      ]);
-      await ctx.reply(bankrollMessage(bankroll, paused, spend, wallet), { parse_mode: "HTML" });
-    }
+    const messages = await Promise.all(
+      exchanges.map(async (exchange) => {
+        const [bankroll, wallet] = await Promise.all([
+          getBankroll(exchange, betTotalsFromBets(bets, exchange.name, isDryRun(exchange))),
+          // read live; an exchange hiccup shouldn't stop /status from answering
+          exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
+        ]);
+        return bankrollMessage(bankroll, paused, spend, wallet);
+      }),
+    );
+    await ctx.reply(messages.join("\n\n"), { parse_mode: "HTML" });
   });
 
   bot.command("summary", async (ctx) => {
