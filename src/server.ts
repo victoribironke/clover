@@ -13,7 +13,13 @@ const authorizedCron = (request: Request) =>
   request.headers.get("authorization") === `Bearer ${config.APP_SECRET}`;
 
 const telegramWebhook = config.onCloudRun
-  ? webhookCallback(bot, "std/http", { secretToken: config.APP_SECRET })
+  ? // grammY's default is to fail after 10s, which makes Telegram resend the update. Give commands
+    // 45s, and if even that runs out, answer "received" so Telegram stops resending.
+    webhookCallback(bot, "std/http", {
+      secretToken: config.APP_SECRET,
+      timeoutMilliseconds: 45_000,
+      onTimeout: "return",
+    })
   : null;
 
 const runJob = async (name: string, job: () => Promise<unknown>) => {
