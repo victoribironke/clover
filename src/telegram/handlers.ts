@@ -9,6 +9,7 @@ import { loadStudies } from "@/jobs/study.ts";
 import { buildDailySummaries } from "@/jobs/summary.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { selfOrigin } from "@/lib/self.ts";
+import { within } from "@/lib/within.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
 import { summarize } from "@/study/stats.ts";
@@ -33,6 +34,10 @@ ${
 /pause: stop scanning and placing
 /resume: start again`;
 
+// a live wallet read may take this long before /status answers without it (Bayse was slow on
+// 2026-10-09 and held the whole reply up)
+const WALLET_WAIT_MS = 5_000;
+
 export const registerHandlers = () => {
   bot.command(["start", "help"], (ctx) => ctx.reply(HELP, { parse_mode: "HTML" }));
 
@@ -50,7 +55,7 @@ export const registerHandlers = () => {
         const [bankroll, wallet] = await Promise.all([
           getBankroll(exchange, betTotalsFromBets(bets, exchange.name, isDryRun(exchange))),
           // read live; an exchange hiccup shouldn't stop /status from answering
-          exchange.canTrade ? exchange.getWallet().catch(() => null) : Promise.resolve(null),
+          exchange.canTrade ? within(exchange.getWallet(), WALLET_WAIT_MS, null) : Promise.resolve(null),
         ]);
         return bankrollMessage(bankroll, paused, spend, wallet);
       }),
