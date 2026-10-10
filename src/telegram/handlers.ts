@@ -3,6 +3,7 @@ import { ALL_STATUSES, betTotalsFromBets, getBet, listBets, updateBet } from "@/
 import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchanges, getExchange, isDryRun } from "@/exchanges/index.ts";
+import { EXCHANGE_LABELS } from "@/exchanges/types.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { loadStudies } from "@/jobs/study.ts";
@@ -18,7 +19,7 @@ import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./for
 import { notify } from "./notify.ts";
 import { resultsMessage } from "./results.ts";
 
-const HELP = `<b>Clover</b> trades daily temperature markets on Bayse, Kalshi and Polymarket (the last two on paper), betting where the data gives it an edge.
+const HELP = `<b>Clover</b> trades daily temperature markets on ${exchanges.map((exchange) => EXCHANGE_LABELS[exchange.name]).join(" and ")}, betting where the data gives it an edge.
 ${
   settings.quiet
     ? "🔕 Muted: bets are placed without messages, and a summary arrives daily at 23:30."
