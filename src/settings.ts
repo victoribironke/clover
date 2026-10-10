@@ -30,8 +30,11 @@ export const settings = {
     // high/low temperature markets in ~50 cities, settled on an airport's hourly reports
     // (src/research/polymarket-weather.ts). $5 until 2026-10-05, then $50: its 5-share minimum
     // had limited $5 to outcomes priced up to 20¢; at $50 anything up to ~49¢ fits the $2.50 floor.
+    // Turned off on 2026-10-10: 1 win in 34 paper bets (-$34 of $39 staked), the last two after the
+    // 2026-10-07 fixes. Its markets had already priced in a higher reading than the hourly reports
+    // we read showed (Paris, Wellington), so our "reading so far" isn't what it settles on.
     polymarket: {
-      enabled: true,
+      enabled: false,
       dryRun: true,
       capital: 50,
       research: "weather-model",
