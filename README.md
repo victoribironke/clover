@@ -2,7 +2,7 @@
 
 A betting assistant for prediction markets. It scans [Bayse Markets](https://docs.bayse.markets/) for open markets and researches the promising ones: Gemini 3.8 Flash searches the web with Google Search and writes a fact brief, and OpenAI's gpt-6-luna makes the call from it. When it finds an edge, it sends you the bet on Telegram. You have a window to cancel before it places the bet.
 
-It also paper-trades [Kalshi](https://kalshi.com) and [Polymarket](https://polymarket.com) (USD): their daily high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) and [Polymarket](#polymarket-paper) below).
+It also paper-trades [Kalshi](https://kalshi.com) (USD): its daily high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) below). [Polymarket](#polymarket-paper-off) was built the same way and is turned off.
 
 **Weather only, from 2026-10-03.** Kalshi weather won 9 of 14 paper bets (+$73 on $100) while every other kind of market lost on Bayse, so every exchange now trades temperature markets only (`kinds` in `settings.exchanges`). Other markets come back once the weather research is as accurate as it can be.
 
@@ -10,7 +10,7 @@ It also paper-trades [Kalshi](https://kalshi.com) and [Polymarket](https://polym
 
 ```
 every 4h   Bayse scan ─► settle ─► filter ─► screen (1 luna call) ─► deep dive per event (Gemini + Google Search → fact brief → luna decides)
-every 2h   Kalshi + Polymarket scan ─► settle ─► today's temperature markets ─► station readings + weather ensemble (no AI)
+every 2h   Kalshi scan ─────────────► settle ─► today's temperature markets ─► station readings + weather ensemble (no AI)
                                                              │
                                              blend with market price, size with ¼ Kelly
                                                              │
@@ -39,9 +39,12 @@ Kalshi's market data is public, so this needs no account and no key. `canTrade` 
 - **Markets.** The daily high and low temperature series for 24 US cities (`kalshiSeries` in `src/settings.ts`). Each settles on one NWS station's reading for the day, midnight to midnight local standard time, in whole °F.
 - **Pricing, no AI.** [`src/research/weather-model.ts`](src/research/weather-model.ts) takes the station's readings so far ([api.weather.gov](https://api.weather.gov)) and a ~120-run weather ensemble (ICON, GFS, ECMWF via [Open-Meteo](https://open-meteo.com)) for the rest of the day. Each run gives one possible final high or low. The share of runs in a band is its probability, with a degree of slack either side because public readings miss the official number by 1°F about a fifth of the time (checked on 192 settled days).
 - **Bets only late in the day.** Forecasts alone don't beat these markets: on the first check they sat 2°F from the price in several cities, which is a whole band. So Kalshi bets need the station's readings after 4 PM local standard time, when the day's high has usually been set. Earlier in the day events are priced and reported, not bet on.
+- **Lows wait for the evening.** A low is only bet on once the temperature is back within 8°F of the day's low so far (`LOW_WITHIN_F`). While it's still far above, the bet rests on the evening forecast: those bets won 9 of 23 at an average price of 54¢, against 17 of 27 at 50¢ for the rest (to 2026-10-10). Later scans check again.
 - **Quotes** walk Kalshi's live order book, whole contracts only, with Kalshi's fee included.
 
-## Polymarket (paper)
+## Polymarket (paper, off)
+
+**Turned off on 2026-10-10** (`enabled: false` in `settings.exchanges`): 1 win in 34 paper bets. The code stays; to bring it back, set `enabled: true` and add it to the `clover-scan-weather` job in the deploy workflow.
 
 Polymarket's Gamma API (events and markets) and its CLOB order books are public: no wallet, no key. `canTrade` is false ([`src/exchanges/polymarket/adapter.ts`](src/exchanges/polymarket/adapter.ts)).
 
@@ -51,7 +54,7 @@ Polymarket's Gamma API (events and markets) and its CLOB order books are public:
 - **Bets only late in the day:** after 4 PM local for highs, after 10 PM for lows (an evening can still undercut a morning low).
 - **Quotes** walk the CLOB's asks with the 5% weather fee (`rate × shares × price × (1 − price)`). The smallest order is 5 shares: on $50, outcomes up to about 49¢ fit the $2.50 minimum-stake rounding.
 
-Going live needs a funded account on each: Kalshi requires US residency; Polymarket needs a crypto wallet and signed orders. Neither is connected yet.
+Going live needs a funded account on each (steps under [Going live](#going-live-on-kalshi-and-polymarket)); Polymarket also needs a crypto wallet and signed orders. Neither is connected yet.
 
 ## Settings vs secrets
 
@@ -97,7 +100,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
    - Bayse scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
-   - Kalshi and Polymarket scan every 2 hours at :15 (`clover-scan-weather`, `/jobs/scan?exchange=kalshi,polymarket`)
+   - Kalshi scans every 2 hours at :15 (`clover-scan-weather`, `/jobs/scan?exchange=kalshi`)
    - late-price study every 6 hours (no model calls, no money)
 
 Send `/status` to your bot to check it's alive.
