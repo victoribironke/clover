@@ -129,8 +129,8 @@ jobs:
 
       # Create the scheduler jobs on the first deploy, keep them pointed at the service afterwards.
       # Bayse scans every 4h (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT; matches settings.scanEveryMinutes) settle,
-      # research and place bets themselves. Kalshi and Polymarket (paper) scan together every 2h at :15
-      # (clover-scan-weather): no AI cost, and their bets only happen late in each city's day, when the
+      # research and place bets themselves. Kalshi (paper) scans every 2h at :15
+      # (clover-scan-weather): no AI cost, and its bets only happen late in each city's day, when the
       # station's readings settle the question.
       # The daily summary at 23:30 WAT settles again and reports the day, per exchange.
       - name: Configure Cloud Scheduler
@@ -147,8 +147,9 @@ jobs:
             fi
           }
           upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
-          # Kalshi and Polymarket weather together (no AI), every 2 hours
-          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi,polymarket" 1800s
+          # Kalshi weather (no AI), every 2 hours. Polymarket is off (settings.exchanges); to bring it
+          # back, scan both with ?exchange=kalshi,polymarket
+          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi" 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
