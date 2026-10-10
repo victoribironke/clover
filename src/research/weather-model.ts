@@ -21,6 +21,15 @@ const LATE_HOUR = 16;
 // The last two days' model misses swing from day to day (LA -2.2°F and Philadelphia +3.3°F on
 // 2026-09-30, both moving the model further from the market), so only part of the miss is applied
 const BIAS_SHARE = 0.5;
+// A low is only bet on once the temperature is back within this many °F of the day's low so far.
+// While it's still far above, the bet rests on the forecast for the evening (or on which side of a
+// rounding line the morning low fell), and the market wins both: of 50 settled low bets at 20¢+
+// up to 2026-10-10, those 8°F or more above won 9 of 23 at an average price of 54¢ (-$30), those
+// within 8°F won 17 of 27 at 50¢ (+$73). Later scans check again as the evening cools.
+const LOW_WITHIN_F = 8;
+
+// whether a low can still be bet on: see LOW_WITHIN_F
+export const lowInReach = (lowSoFar: number, latest: number) => latest - lowSoFar < LOW_WITHIN_F;
 
 const quantile = (sorted: number[], q: number) =>
   sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
@@ -79,7 +88,13 @@ const kalshiWeather = async (
   // late in the climate day do we count as having a live reading (bets need one: weather is in
   // settings.liveReadingRequiredKinds); before that the event is priced and reported, not bet on.
   const hoursIntoDay = (now - start) / 3_600_000;
-  const late = observed !== null && hoursIntoDay >= LATE_HOUR;
+  const latest = today.at(-1);
+  const farFromLow =
+    question.kind === "low" &&
+    observed !== null &&
+    latest !== undefined &&
+    !lowInReach(observed.min, latest.f);
+  const late = observed !== null && hoursIntoDay >= LATE_HOUR && !farFromLow;
   const confidence: DeepDive["estimates"][number]["confidence"] = late
     ? "high"
     : observed !== null
@@ -94,7 +109,6 @@ const kalshiWeather = async (
     }));
 
   const word = question.kind === "high" ? "high" : "low";
-  const latest = today.at(-1);
   const median = quantile(values, 0.5);
   const spread = `${quantile(values, 0.1)}-${quantile(values, 0.9)}°F`;
   const soFar =
@@ -111,7 +125,11 @@ const kalshiWeather = async (
     summary: [
       soFar ? `${soFar}.` : "Forecast only (the day hasn't started).",
       `${forecast}.`,
-      late ? "" : "No bet before 4 PM local standard time: forecasts alone don't beat this market.",
+      late
+        ? ""
+        : farFromLow
+          ? `No bet yet: it's still ${LOW_WITHIN_F}°F or more above the day's low, so the evening forecast decides, and that hasn't beaten this market.`
+          : "No bet before 4 PM local standard time: forecasts alone don't beat this market.",
     ]
       .filter(Boolean)
       .join(" "),
