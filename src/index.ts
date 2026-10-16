@@ -1,6 +1,6 @@
 import { config } from "@/config.ts";
 import { releaseHeldLocks } from "@/db/kv.ts";
-import { bayse, exchanges, kalshi, polymarket } from "@/exchanges/index.ts";
+import { bayse, exchanges, kalshi, kalshiMulti, polymarket } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
 import { runStudy } from "@/jobs/study.ts";
 import { runTick } from "@/jobs/tick.ts";
@@ -85,6 +85,11 @@ const main = async () => {
     if (exchanges.includes(kalshi)) {
       every(settings.kalshiScanEveryMinutes, "scan kalshi", () =>
         queueWeatherScan(() => runScanAndReport(kalshi)),
+      )();
+    }
+    if (exchanges.includes(kalshiMulti)) {
+      every(settings.kalshiScanEveryMinutes, "scan kalshi-multi", () =>
+        queueWeatherScan(() => runScanAndReport(kalshiMulti)),
       )();
     }
     if (exchanges.includes(polymarket)) {
