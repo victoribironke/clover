@@ -42,6 +42,16 @@ Kalshi's market data is public, so this needs no account and no key. `canTrade` 
 - **Lows wait for the evening.** A low is only bet on once the temperature is back within 8°F of the day's low so far (`LOW_WITHIN_F`). While it's still far above, the bet rests on the evening forecast: those bets won 9 of 23 at an average price of 54¢, against 17 of 27 at 50¢ for the rest (to 2026-10-10). Later scans check again.
 - **Quotes** walk Kalshi's live order book, whole contracts only, with Kalshi's fee included.
 
+## Kalshi multi-source (paper, from 2026-10-16)
+
+The same Kalshi markets, on a second $50 of paper capital (`kalshi-multi` in `settings.exchanges`), priced by a new model so it can be compared with the old one on the same days. The old model lost to the market (42 bets from 10 to 16 October: 19 won, −$43): it read the station right, but its forecast for the rest of the day came from coarse global models.
+
+- **Four forecasts for the hours left** ([`src/research/multi-source-weather.ts`](src/research/multi-source-weather.ts)): HRRR (3 km, rerun every hour) and the National Blend of Models via [Open-Meteo](https://open-meteo.com), the NWS hourly forecast for the spot, and the ICON/GFS/ECMWF ensemble.
+- **Anchored to the station.** Each forecast is shifted by however far it is off the latest hourly reading, so a model that's 4°F warm right now can't say the high is still to come.
+- **Bets only when they agree:** the four final highs/lows within 2°F, and at least three sources answering. Otherwise it's a near miss in the scan report.
+- **AI check on each bet** ([`src/research/weather-review.ts`](src/research/weather-review.ts)): gpt-6-luna reads the numbers and the local NWS office's forecast discussion (fronts, clouds, wind shifts) and can veto with a reason. About $0.0005 a check. Vetoed bets are kept as `skipped` with the reason, so the check can be scored later. No check (budget spent, OpenAI down), no bet.
+- Bets still wait for 4 PM local standard time, like the old model.
+
 ## Polymarket (paper, off)
 
 **Turned off on 2026-10-10** (`enabled: false` in `settings.exchanges`): 1 win in 34 paper bets. The code stays; to bring it back, set `enabled: true` and add it to the `clover-scan-weather` job in the deploy workflow.
@@ -100,7 +110,7 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
    - Bayse scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
-   - Kalshi scans every 2 hours at :15 (`clover-scan-weather`, `/jobs/scan?exchange=kalshi`)
+   - Kalshi scans every 2 hours at :15, the old model then the multi-source one (`clover-scan-weather`, `/jobs/scan?exchange=kalshi,kalshi-multi`)
    - late-price study every 6 hours (no model calls, no money)
 
 Send `/status` to your bot to check it's alive.
