@@ -21,7 +21,7 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 const DATE = /\b([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),\s*(\d{4})\b/;
 
 export const parseTemperatureQuestion = (event: MarketEvent): TemperatureQuestion | null => {
-  if (event.exchange !== "kalshi") return null;
+  if (event.exchange !== "kalshi" && event.exchange !== "kalshi-multi") return null;
   const kind = /^KXHIGH/i.test(event.id) ? "high" : /^KXLOW/i.test(event.id) ? "low" : null;
   const rules = event.markets[0]?.rules ?? "";
   const station = rules.match(/\(CLI([A-Z]{3})\)/)?.[1];
@@ -187,7 +187,7 @@ export const extremeBias = (
 
 // --- fetching ---
 
-const NWS_HEADERS = {
+export const NWS_HEADERS = {
   "User-Agent": "clover-bot (prediction market research)",
   Accept: "application/geo+json",
 };
@@ -199,7 +199,7 @@ const stations = new Map<string, Station>();
 const CACHE_MS = 10 * 60_000;
 const cache = new Map<string, { at: number; data: Promise<unknown> }>();
 
-const getJson = <T>(url: string, headers?: Record<string, string>): Promise<T> => {
+export const getJson = <T>(url: string, headers?: Record<string, string>): Promise<T> => {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.data as Promise<T>;
   const data = (async () => {
