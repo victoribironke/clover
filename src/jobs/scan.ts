@@ -15,11 +15,13 @@ import { isGeminiUnavailable } from "@/llm/gemini.ts";
 import { isOpenAiUnavailable } from "@/llm/openai.ts";
 import { deepDive, type DeepDive } from "@/research/deep-dive.ts";
 import { triageEvents } from "@/research/triage.ts";
+import { multiSourceWeather } from "@/research/multi-source-weather.ts";
+import { reviewWeatherBet } from "@/research/weather-review.ts";
 import { weatherModel } from "@/research/weather-model.ts";
 import { settings } from "@/settings.ts";
 import { getBankroll, reserveBankroll } from "@/strategy/bankroll.ts";
 import { eligibleEvents } from "@/strategy/eligibility.ts";
-import { proposeBet, type NearMiss } from "@/strategy/propose.ts";
+import { proposeBet, type NearMiss, type Proposal } from "@/strategy/propose.ts";
 import {
   failureMessage,
   lagosTime,
@@ -77,29 +79,47 @@ const skipped = (exchange: ExchangeName, skippedReason: string): ScanReport => (
 // How an exchange's events are researched (settings.exchanges[name].research):
 // "ai" = screen with gpt-6-luna, then a Gemini + luna deep dive per event (costs money, capped);
 // "weather-model" = price every event from data (free, so all of them, every scan)
+// "multi-source" = the same, from four forecasts that must agree, plus an AI check on each bet
 type Researcher = {
   pick: (eligible: MarketEvent[]) => Promise<string[]>;
   // "waiting": nothing to bet on yet (weather markets before the late-day readings), skipped
   research: (event: MarketEvent, now: number) => Promise<DeepDive | "waiting">;
   // AI research is budgeted and re-checked at most every researchCooldownHours
   paid: boolean;
+  // a last check on a proposed bet: null to go ahead, or why not
+  review?: (event: MarketEvent, research: DeepDive, proposal: Proposal) => Promise<string | null>;
 };
 
-const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
+// Only today's markets: bets wait for the station's readings late in the day, so tomorrow's
+// can't be bet on yet. 36 hours, because Polymarket's "close" is noon UTC the day after (when
+// every time zone's day is over). Soonest first.
+const todaysEvents = async (eligible: MarketEvent[]) =>
+  eligible
+    .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 36 * HOUR)
+    .sort((a, b) => (a.closingDate ?? "").localeCompare(b.closingDate ?? ""))
+    .map((event) => event.id);
+
+// The AI check on a multi-source bet. It fails closed: no check (budget spent, OpenAI down, no
+// forecast discussion), no bet.
+const reviewOrVeto: NonNullable<Researcher["review"]> = async (event, research, proposal) => {
+  if ((await spendToday()) >= settings.dailyResearchBudgetUsd)
+    return "daily research budget reached, so it couldn't be checked";
+  try {
+    return await reviewWeatherBet(event, research, proposal);
+  } catch (error) {
+    log.warn("weather review failed", { eventId: event.id, error: errorMessage(error) });
+    return `the check failed (${errorMessage(error)})`;
+  }
+};
+
+const RESEARCHERS: Record<"ai" | "weather-model" | "multi-source", Researcher> = {
   ai: {
     pick: (eligible) => triageEvents(eligible, settings.maxDeepDivesPerScan),
     research: (event) => deepDive(event),
     paid: true,
   },
   "weather-model": {
-    // Only today's markets: bets wait for the station's readings late in the day, so tomorrow's
-    // can't be bet on yet. 36 hours, because Polymarket's "close" is noon UTC the day after (when
-    // every time zone's day is over). Soonest first.
-    pick: async (eligible) =>
-      eligible
-        .filter((event) => Date.parse(event.closingDate ?? "") - Date.now() < 36 * HOUR)
-        .sort((a, b) => (a.closingDate ?? "").localeCompare(b.closingDate ?? ""))
-        .map((event) => event.id),
+    pick: todaysEvents,
     research: async (event, now) => {
       const research = await weatherModel(event, now);
       if (!research) throw new Error("Not a temperature market the weather model can read");
@@ -107,6 +127,64 @@ const RESEARCHERS: Record<"ai" | "weather-model", Researcher> = {
     },
     paid: false,
   },
+  "multi-source": {
+    pick: todaysEvents,
+    research: async (event, now) => {
+      const research = await multiSourceWeather(event, now);
+      if (!research) throw new Error("Not a temperature market the multi-source model can read");
+      return research;
+    },
+    // the forecasts are free; only the check on each proposed bet costs (a fraction of a cent)
+    paid: false,
+    review: reviewOrVeto,
+  },
+};
+
+// A vetoed proposal, as the scan report's near miss
+const vetoed = (proposal: Proposal, reason: string): NearMiss => ({
+  marketTitle: proposal.market.title,
+  outcomeLabel: proposal.outcome.label,
+  modelProbability: proposal.modelProbability,
+  marketPrice: proposal.outcome.price,
+  probability: proposal.probability,
+  confidence: proposal.confidence,
+  price: proposal.quotedPrice,
+  expectedReturn: proposal.expectedReturn,
+  reason: `AI check: ${reason}`,
+});
+
+// A vetoed bet is kept as "skipped" (never placed, never announced), so whether the AI check was
+// right can be scored against the result later
+const recordVeto = async (
+  exchange: Exchange,
+  event: MarketEvent,
+  proposal: Proposal,
+  research: DeepDive,
+  reason: string,
+) => {
+  const bet = await createBet({
+    exchange: exchange.name,
+    currency: exchange.currency,
+    eventId: event.id,
+    marketId: proposal.market.id,
+    outcomeId: proposal.outcome.id,
+    eventTitle: event.title,
+    category: event.category,
+    kind: marketKind(event),
+    marketTitle: proposal.market.title,
+    outcomeLabel: proposal.outcome.label,
+    analysisId: null,
+    probability: proposal.probability,
+    marketPrice: proposal.outcome.price,
+    quotedPrice: proposal.quotedPrice,
+    expectedReturn: proposal.expectedReturn,
+    confidence: proposal.confidence,
+    stake: proposal.stake,
+    rationale: research.summary,
+    dryRun: isDryRun(exchange),
+    executeAt: new Date().toISOString(),
+  });
+  await updateBet(bet.id, { status: "skipped", error: `AI check: ${reason}` }, ["pending"]);
 };
 
 // The research half of a scan: pick events, research them, propose bets. Early exits (no free
@@ -195,13 +273,20 @@ const researchAndPropose = async (exchange: Exchange, startedAt: number): Promis
       researched++;
       // re-read prices: research can take minutes and the market may have moved
       const fresh = await exchange.getEvent(event.id);
-      const { proposal, nearMiss } = await proposeBet(
+      const verdict = await proposeBet(
         exchange,
         fresh,
         research.estimates,
         bankroll,
         research.liveData,
       );
+      const veto =
+        verdict.proposal && researcher.review
+          ? await researcher.review(fresh, research, verdict.proposal)
+          : null;
+      const proposal = veto ? null : verdict.proposal;
+      const nearMiss = veto ? vetoed(verdict.proposal!, veto) : verdict.nearMiss;
+      if (veto) await recordVeto(exchange, fresh, verdict.proposal!, research, veto);
       // free research checks every event on every scan: only keep the ones that led to a bet
       const analysisId =
         researcher.paid || proposal
