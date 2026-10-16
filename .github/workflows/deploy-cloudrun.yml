@@ -147,9 +147,9 @@ jobs:
             fi
           }
           upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
-          # Kalshi weather (no AI), every 2 hours. Polymarket is off (settings.exchanges); to bring it
-          # back, scan both with ?exchange=kalshi,polymarket
-          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi" 1800s
+          # Kalshi weather every 2 hours: the old model, then the multi-source one (from 2026-10-16),
+          # one after the other. Polymarket is off (settings.exchanges); to bring it back, add it here
+          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi,kalshi-multi" 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
           # late-price study: records how settled markets were priced near the end (no Gemini)
           upsert clover-study "30 */6 * * *" /jobs/study 1800s
