@@ -1,11 +1,14 @@
 // Exchange-agnostic shapes. Bayse and Kalshi map onto the same types (Polymarket next), so the
 // research/sizing/execution pipeline never needs to know which venue it is talking to.
 
-export type ExchangeName = "bayse" | "kalshi" | "polymarket";
+// "kalshi-multi" is Kalshi again, on its own paper capital, priced by the multi-source model
+// (src/research/multi-source-weather.ts) so it can be compared with "kalshi" on the same days
+export type ExchangeName = "bayse" | "kalshi" | "kalshi-multi" | "polymarket";
 
 export const EXCHANGE_LABELS: Record<ExchangeName, string> = {
   bayse: "Bayse",
   kalshi: "Kalshi",
+  "kalshi-multi": "Kalshi multi-source",
   polymarket: "Polymarket",
 };
 export type Currency = "NGN" | "USD";
