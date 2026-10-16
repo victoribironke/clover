@@ -26,6 +26,18 @@ export const settings = {
       research: "weather-model",
       kinds: ["weather"],
     },
+    // The same Kalshi markets on their own $50 of paper capital, priced by the multi-source model
+    // (src/research/multi-source-weather.ts, from 2026-10-16): HRRR, the National Blend of Models,
+    // the NWS hourly forecast and the ensemble, each anchored to the latest reading; bets only when
+    // they agree, and each bet is checked by the reasoning model against the NWS forecast
+    // discussion. Runs beside "kalshi" (the old model) so the two can be compared on the same days.
+    "kalshi-multi": {
+      enabled: true,
+      dryRun: true,
+      capital: 50,
+      research: "multi-source",
+      kinds: ["weather"],
+    },
     // USD, paper only for now (from 2026-10-03): public market data, no wallet connected. Daily
     // high/low temperature markets in ~50 cities, settled on an airport's hourly reports
     // (src/research/polymarket-weather.ts). $5 until 2026-10-05, then $50: its 5-share minimum
