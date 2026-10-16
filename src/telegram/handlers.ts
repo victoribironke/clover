@@ -19,7 +19,8 @@ import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./for
 import { notify } from "./notify.ts";
 import { resultsMessage } from "./results.ts";
 
-const HELP = `<b>Clover</b> trades daily temperature markets on ${exchanges.map((exchange) => EXCHANGE_LABELS[exchange.name]).join(" and ")}, betting where the data gives it an edge.
+const labels = exchanges.map((exchange) => EXCHANGE_LABELS[exchange.name]);
+const HELP = `<b>Clover</b> trades daily temperature markets on ${labels.slice(0, -1).join(", ")}${labels.length > 1 ? " and " : ""}${labels.at(-1) ?? ""}, betting where the data gives it an edge.
 ${
   settings.quiet
     ? "🔕 Muted: bets are placed without messages, and a summary arrives daily at 23:30."
