@@ -2,7 +2,7 @@
 
 A betting assistant for prediction markets. It scans [Bayse Markets](https://docs.bayse.markets/) for open markets and researches the promising ones: Gemini 3.8 Flash searches the web with Google Search and writes a fact brief, and OpenAI's gpt-6-luna makes the call from it. When it finds an edge, it sends you the bet on Telegram. You have a window to cancel before it places the bet.
 
-It also paper-trades [Kalshi](https://kalshi.com) (USD): its daily high/low temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) below). [Polymarket](#polymarket-paper-off) was built the same way and is turned off.
+It also paper-trades [Kalshi](https://kalshi.com) (USD): its daily low-temperature markets, priced from data with no AI (see [Kalshi](#kalshi-paper) below). [Polymarket](#polymarket-paper-off) was built the same way and is turned off.
 
 **Weather only, from 2026-10-03.** Kalshi weather won 9 of 14 paper bets (+$73 on $100) while every other kind of market lost on Bayse, so every exchange now trades temperature markets only (`kinds` in `settings.exchanges`). Other markets come back once the weather research is as accurate as it can be.
 
@@ -24,7 +24,7 @@ every 2h   Kalshi scan ─────────────► settle ─► 
 - **Data-settled markets only.** It only bets on markets that settle on measurable public data: prices, exchange rates, temperatures, post and stream counts, chart positions, official statistics, plus sports results and goals. Politics, awards, reality TV and anything else decided by people is left out, first by category (`categories` in `src/settings.ts`) and then by the screening step. Markets must resolve within 7 days (`maxHoursToResolve`).
 - **No engagement markets.** Likes, views, reposts and follower counts are excluded (`excludedKinds` in `src/settings.ts`). Anyone who buys bots can move those numbers, and Bayse voids them more often.
 - **Sports only with bookmaker odds.** Match stats (shots, passes, corners, cards) are skipped because bookmakers rarely price them. Results and goals markets are researched, but only bet on when the research finds current bookmaker odds for that line.
-- **Late-price study.** Every 6 hours a job records how recently settled markets were priced in the final hour before their measurement time, plus voids. It makes no model calls and moves no money. `/study` shows whether late prices are systematically off, and for which market types, before we build a closing-window strategy on it.
+- **Speed test (2026-10-24 to 11-01).** Every minute, a job reads the latest airport report for each Kalshi city (aviationweather.gov) and, when a new one appears, snapshots that city's Kalshi prices then and 1, 2, 3, 5, 10 and 15 minutes later, against a baseline taken before the hourly reports. If prices only move minutes after a report that changes the low, a bot reading reports the moment they post could trade in that gap; if they've already moved, there's no gap. It never trades. `/speed` shows the results so far ([`src/speed/`](src/speed/), [`src/jobs/speed.ts`](src/jobs/speed.ts)). The late-price study it replaced never recorded a price: Bayse's price history reports 0 for order-book markets.
 - **Live data first.** Before research, the bot fetches hard data itself where it can: a 122-run weather-model ensemble for temperature markets, and public mirrors of the Spotify and Apple Music Nigeria charts. The research must report the current reading it based its estimate on, which is shown on every bet. Without a live reading, confidence is capped at low, so history alone rarely triggers a bet. Sports and post counts need one to be bet on at all (bookmaker odds for the line, or the count so far).
 - **Research.** The model never sees the market price, so it forms its own estimate. That estimate is then blended with the market price, weighted by the model's confidence (low 25%, medium 50%, high 70%). The market is usually right, so the bot only bets when the blended number still beats it.
 - **Sizing.** Quarter Kelly on the blended probability, capped at 10% of capital, and only if the expected return after fees and price impact is at least 5%. At most one bet per event.
@@ -36,21 +36,12 @@ every 2h   Kalshi scan ─────────────► settle ─► 
 
 Kalshi's market data is public, so this needs no account and no key. `canTrade` is false in the adapter ([`src/exchanges/kalshi/adapter.ts`](src/exchanges/kalshi/adapter.ts)): every Kalshi bet is paper.
 
-- **Markets.** The daily high and low temperature series for 24 US cities (`kalshiSeries` in `src/settings.ts`). Each settles on one NWS station's reading for the day, midnight to midnight local standard time, in whole °F.
+- **Markets.** The daily low-temperature series for 24 US cities (`kalshiSeries` in `src/settings.ts`). Each settles on one NWS station's reading for the day, midnight to midnight local standard time, in whole °F.
+- **No daily highs (from 2026-10-22).** They won 3 of 23 bets (−$42). By 4 PM the high is set, so the bet only turns on which side of a band edge it rounds to; our readings are only good to ±0.9°F and the market priced the right band every time.
 - **Pricing, no AI.** [`src/research/weather-model.ts`](src/research/weather-model.ts) takes the station's readings so far ([api.weather.gov](https://api.weather.gov)) and a ~120-run weather ensemble (ICON, GFS, ECMWF via [Open-Meteo](https://open-meteo.com)) for the rest of the day. Each run gives one possible final high or low. The share of runs in a band is its probability, with a degree of slack either side because public readings miss the official number by 1°F about a fifth of the time (checked on 192 settled days).
 - **Bets only late in the day.** Forecasts alone don't beat these markets: on the first check they sat 2°F from the price in several cities, which is a whole band. So Kalshi bets need the station's readings after 4 PM local standard time, when the day's high has usually been set. Earlier in the day events are priced and reported, not bet on.
 - **Lows wait for the evening.** A low is only bet on once the temperature is back within 8°F of the day's low so far (`LOW_WITHIN_F`). While it's still far above, the bet rests on the evening forecast: those bets won 9 of 23 at an average price of 54¢, against 17 of 27 at 50¢ for the rest (to 2026-10-10). Later scans check again.
 - **Quotes** walk Kalshi's live order book, whole contracts only, with Kalshi's fee included.
-
-## Kalshi multi-source (paper, from 2026-10-16)
-
-The same Kalshi markets, on a second $50 of paper capital (`kalshi-multi` in `settings.exchanges`), priced by a new model so it can be compared with the old one on the same days. The old model lost to the market (42 bets from 10 to 16 October: 19 won, −$43): it read the station right, but its forecast for the rest of the day came from coarse global models.
-
-- **Four forecasts for the hours left** ([`src/research/multi-source-weather.ts`](src/research/multi-source-weather.ts)): HRRR (3 km, rerun every hour) and the National Blend of Models via [Open-Meteo](https://open-meteo.com), the NWS hourly forecast for the spot, and the ICON/GFS/ECMWF ensemble.
-- **Anchored to the station.** Each forecast is shifted by however far it is off the latest hourly reading, so a model that's 4°F warm right now can't say the high is still to come.
-- **Bets only when they agree:** the four final highs/lows within 2°F, and at least three sources answering. Otherwise it's a near miss in the scan report.
-- **AI check on each bet** ([`src/research/weather-review.ts`](src/research/weather-review.ts)): gpt-6-luna reads the numbers and the local NWS office's forecast discussion (fronts, clouds, wind shifts) and can veto with a reason. About $0.0005 a check. Vetoed bets are kept as `skipped` with the reason, so the check can be scored later. No check (budget spent, OpenAI down), no bet.
-- Bets still wait for 4 PM local standard time, like the old model.
 
 ## Polymarket (paper, off)
 
@@ -110,8 +101,8 @@ Push to `main`, or run the workflow by hand from the Actions tab. [`.github/work
 5. creates or updates the Cloud Scheduler jobs:
    - daily summary at 23:30 WAT (the 5-minute tick was retired; scans settle and place bets themselves)
    - Bayse scan every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 WAT)
-   - Kalshi scans every 2 hours at :15, the old model then the multi-source one (`clover-scan-weather`, `/jobs/scan?exchange=kalshi,kalshi-multi`)
-   - late-price study every 6 hours (no model calls, no money)
+   - Kalshi scans every 2 hours at :15 (`clover-scan-weather`, `/jobs/scan?exchange=kalshi`)
+   - speed test every minute until 2026-11-01 (no trades)
 
 Send `/status` to your bot to check it's alive.
 
@@ -126,7 +117,7 @@ Service URL: **https://clover-uhkg4fo2na-od.a.run.app** (Cloud Run `clover`, eur
   ```
   Use `/jobs/scan` in place of `/jobs/tick` to run a Bayse scan, `/jobs/scan?exchange=kalshi` (or `polymarket`, or a comma list) for the others, or `/jobs/scan?exchange=all` for everything side by side (what `/scan` in Telegram does).
 - **Logs:** Cloud Run → `clover` → _Logs_. Every line is JSON with `message` and `severity`, so filter on `severity>=WARNING` to see problems.
-- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-weather`, `clover-summary` and `clover-study`. _Force run_ triggers one immediately.
+- **Scheduled jobs:** Cloud Scheduler (europe-west1) → `clover-scan`, `clover-scan-weather`, `clover-summary` and `clover-speed`. _Force run_ triggers one immediately.
 
 ## Running locally
 
@@ -152,7 +143,7 @@ Running locally with the production bot token switches Telegram from the webhook
 | `/summary`           | The last 24 hours per exchange: bets placed, results, open bets, research spend, problems                                           |
 | `/bets`              | Pending and open bets                                                                                                               |
 | `/scan`              | Run a scan now, on every exchange                                                                                                   |
-| `/study`             | Late-price study: are prices fair near the end, void rates by market type                                                           |
+| `/speed`             | Speed test so far: do Kalshi prices lag new station reports?                                                                        |
 | `/pause` / `/resume` | Stop or start scanning and placing. Pending bets wait.                                                                              |
 
 ## Going live on Kalshi and Polymarket
