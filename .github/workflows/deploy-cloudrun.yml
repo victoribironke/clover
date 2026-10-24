@@ -147,15 +147,16 @@ jobs:
             fi
           }
           upsert clover-scan "0 */4 * * *" /jobs/scan 1800s
-          # Kalshi weather every 2 hours: the old model, then the multi-source one (from 2026-10-16),
-          # one after the other. Polymarket is off (settings.exchanges); to bring it back, add it here
-          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi,kalshi-multi" 1800s
+          # Kalshi weather (no AI), every 2 hours. Polymarket is off (settings.exchanges); to bring it
+          # back, scan both with ?exchange=kalshi,polymarket
+          upsert clover-scan-weather "15 */2 * * *" "/jobs/scan?exchange=kalshi" 1800s
           upsert clover-summary "30 23 * * *" /jobs/summary 600s
-          # late-price study: records how settled markets were priced near the end (no Gemini)
-          upsert clover-study "30 */6 * * *" /jobs/study 1800s
+          # speed test: every minute until settings.speedTestUntil (2026-11-01), then each call returns
+          # at once; delete this line (and add it to the retired list) once it's done
+          upsert clover-speed "* * * * *" /jobs/speed 120s
 
           # retired jobs: removing them from this list alone would leave them running
-          for retired in clover-tick clover-scan-kalshi; do
+          for retired in clover-tick clover-scan-kalshi clover-study; do
             if gcloud scheduler jobs describe "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
               gcloud scheduler jobs delete "$retired" --location="${{ env.SCHEDULER_REGION }}" --project="${{ env.PROJECT_ID }}" --quiet
             fi
