@@ -1,21 +1,21 @@
 import { config } from "@/config.ts";
 import { ALL_STATUSES, betTotalsFromBets, getBet, listBets, updateBet } from "@/db/bets.ts";
+import { collection } from "@/db/firestore.ts";
 import { isPaused, setPaused } from "@/db/kv.ts";
 import { spendThisMonth, spendToday } from "@/db/spend.ts";
 import { exchanges, getExchange, isDryRun } from "@/exchanges/index.ts";
 import { EXCHANGE_LABELS } from "@/exchanges/types.ts";
 import { executeBet } from "@/jobs/execute.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
-import { loadStudies } from "@/jobs/study.ts";
 import { buildDailySummaries } from "@/jobs/summary.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { selfOrigin } from "@/lib/self.ts";
 import { within } from "@/lib/within.ts";
 import { settings } from "@/settings.ts";
+import { speedMessage, type SpeedDoc } from "@/speed/stats.ts";
 import { getBankroll } from "@/strategy/bankroll.ts";
-import { summarize } from "@/study/stats.ts";
 import { bot } from "./bot.ts";
-import { bankrollMessage, failureMessage, statusLine, studyMessage } from "./format.ts";
+import { bankrollMessage, failureMessage, statusLine } from "./format.ts";
 import { notify } from "./notify.ts";
 import { resultsMessage } from "./results.ts";
 
@@ -31,8 +31,8 @@ ${
 /summary: the last 24 hours (also sent daily at 23:30)
 /results: all-time results by market type, and how accurate the bot's odds are
 /bets: pending and open bets
+/speed: the speed test so far (do Kalshi prices lag new station reports?)
 /scan: run a scan now, on every exchange
-/study: how Bayse prices behave near the end, and void rates by type
 /pause: stop scanning and placing
 /resume: start again`;
 
@@ -84,9 +84,9 @@ export const registerHandlers = () => {
     }
   });
 
-  bot.command("study", async (ctx) => {
-    // the late-price study only covers Bayse
-    await ctx.reply(studyMessage(summarize(await loadStudies())), { parse_mode: "HTML" });
+  bot.command("speed", async (ctx) => {
+    const docs = (await collection("speed").get()).docs.map((doc) => doc.data() as SpeedDoc);
+    await ctx.reply(speedMessage(docs, settings.speedTestUntil), { parse_mode: "HTML" });
   });
 
   bot.command("bets", async (ctx) => {
