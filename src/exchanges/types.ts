@@ -1,14 +1,11 @@
 // Exchange-agnostic shapes. Bayse and Kalshi map onto the same types (Polymarket next), so the
 // research/sizing/execution pipeline never needs to know which venue it is talking to.
 
-// "kalshi-multi" is Kalshi again, on its own paper capital, priced by the multi-source model
-// (src/research/multi-source-weather.ts) so it can be compared with "kalshi" on the same days
-export type ExchangeName = "bayse" | "kalshi" | "kalshi-multi" | "polymarket";
+export type ExchangeName = "bayse" | "kalshi" | "polymarket";
 
 export const EXCHANGE_LABELS: Record<ExchangeName, string> = {
   bayse: "Bayse",
   kalshi: "Kalshi",
-  "kalshi-multi": "Kalshi multi-source",
   polymarket: "Polymarket",
 };
 export type Currency = "NGN" | "USD";
@@ -101,9 +98,6 @@ export type OrderQuery = {
 
 export type Wallet = { available: number; pending: number };
 
-// outcome1 ("YES") price over time, per market id; t is epoch ms
-export type PriceHistory = Record<string, { t: number; p: number }[]>;
-
 export type Exchange = {
   name: ExchangeName;
   // false = market data only (no account connected): every bet is paper, and the account
@@ -125,8 +119,4 @@ export type Exchange = {
   getAvailableBalance: () => Promise<number>;
   // the real wallet, in `currency`: available to trade, and pending (e.g. deposits clearing)
   getWallet: () => Promise<Wallet>;
-  // newest first, stopping once events settled before `since`
-  listSettledEvents: (status: "resolved" | "cancelled", since: Date) => Promise<MarketEvent[]>;
-  // recent price paths; Bayse keeps 1-minute points for the last 12 hours
-  priceHistory: (eventId: string) => Promise<PriceHistory>;
 };
