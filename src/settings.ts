@@ -16,26 +16,14 @@ export const settings = {
     // NGN. Researched with AI (Gemini search + gpt-6-luna), plus the weather ensemble Data line.
     bayse: { enabled: true, dryRun: true, capital: 10_000, research: "ai", kinds: ["weather"] },
     // USD, paper only for now: no account is connected, it reads Kalshi's public market data
-    // (from 2026-09-30). Daily US high/low temperature markets, priced from a weather-model
-    // ensemble plus the settlement station's own readings, with no AI calls
-    // (src/research/weather-model.ts). Capital $100 until 2026-10-03, $5 until 2026-10-05, then $50.
+    // (from 2026-09-30). Daily US low-temperature markets (highs dropped 2026-10-22, see
+    // kalshiSeries), priced from a weather-model ensemble plus the settlement station's own
+    // readings, with no AI calls (src/research/weather-model.ts). Capital $100 until 2026-10-03, $5 until 2026-10-05, then $50.
     kalshi: {
       enabled: true,
       dryRun: true,
       capital: 50,
       research: "weather-model",
-      kinds: ["weather"],
-    },
-    // The same Kalshi markets on their own $50 of paper capital, priced by the multi-source model
-    // (src/research/multi-source-weather.ts, from 2026-10-16): HRRR, the National Blend of Models,
-    // the NWS hourly forecast and the ensemble, each anchored to the latest reading; bets only when
-    // they agree, and each bet is checked by the reasoning model against the NWS forecast
-    // discussion. Runs beside "kalshi" (the old model) so the two can be compared on the same days.
-    "kalshi-multi": {
-      enabled: true,
-      dryRun: true,
-      capital: 50,
-      research: "multi-source",
       kinds: ["weather"],
     },
     // USD, paper only for now (from 2026-10-03): public market data, no wallet connected. Daily
@@ -126,49 +114,29 @@ export const settings = {
   // the 5,000 free (8 a day would run close); the daily budget still caps spend
   scanEveryMinutes: 240,
   tickEveryMinutes: 1,
-  // late-price study: records settled markets (no Gemini); must stay under 11 hours (see src/jobs/study.ts)
-  studyEveryMinutes: 360,
 
   // Kalshi scans run every 2 hours (clover-scan-kalshi): no AI cost, and same-day station
   // readings change the picture through the day
   kalshiScanEveryMinutes: 120,
   // Polymarket scans with Kalshi (clover-scan-weather, every 2 hours)
   polymarketScanEveryMinutes: 120,
+  // The speed test (src/speed/record.ts, from 2026-10-24) runs every minute (clover-speed) until
+  // this time, then each call returns at once. It never trades.
+  speedTestUntil: "2026-11-01T00:00:00Z",
 
   bayseBaseUrl: "https://relay.bayse.markets",
   kalshiBaseUrl: "https://external-api.kalshi.com/trade-api/v2",
   // Polymarket: Gamma lists events, the CLOB serves order books (both public)
   polymarketGammaUrl: "https://gamma-api.polymarket.com",
   polymarketClobUrl: "https://clob.polymarket.com",
-  // Kalshi's daily US temperature series (checked 2026-09-30: all have open events every day).
+  // Kalshi's daily US low-temperature series (checked 2026-09-30: all have open events every day).
   // Each settles on one NWS climate station, named in the rules as "(CLIxxx)".
+  // The 24 daily-high series (KXHIGHNY, KXHIGHCHI, ...: see git history) were dropped on 2026-10-22:
+  // 3 wins in 23 bets at 20¢+ (-$42), and 0 of 11 for both models from 2026-10-16. At 4 PM the high
+  // is already set, so the bet only turns on which side of a band edge it rounds to, and our
+  // readings (whole °C, ±0.9°F) can't tell; the market priced the right band every time. Lows were
+  // about break-even (164 bets, +$7).
   kalshiSeries: [
-    // daily highs
-    "KXHIGHNY",
-    "KXHIGHCHI",
-    "KXHIGHMIA",
-    "KXHIGHLAX",
-    "KXHIGHDEN",
-    "KXHIGHAUS",
-    "KXHIGHPHIL",
-    "KXHIGHTATL",
-    "KXHIGHTBOS",
-    "KXHIGHTDAL",
-    "KXHIGHTDC",
-    "KXHIGHTEWR",
-    "KXHIGHTHOU",
-    "KXHIGHTLV",
-    "KXHIGHTMIN",
-    "KXHIGHTNOLA",
-    "KXHIGHTOKC",
-    "KXHIGHTPHX",
-    "KXHIGHTSAN",
-    "KXHIGHTSATX",
-    "KXHIGHTSDF",
-    "KXHIGHTSEA",
-    "KXHIGHTSFO",
-    "KXHIGHTTTN",
-    // daily lows
     "KXLOWTNYC",
     "KXLOWTCHI",
     "KXLOWTMIA",
