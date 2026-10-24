@@ -18,13 +18,6 @@ export const kalshi = createKalshiExchange({
   series: settings.kalshiSeries,
 });
 
-// Kalshi's markets again, on separate paper capital, for the multi-source model
-export const kalshiMulti = createKalshiExchange({
-  name: "kalshi-multi",
-  baseUrl: settings.kalshiBaseUrl,
-  series: settings.kalshiSeries,
-});
-
 export const polymarket = createPolymarketExchange({
   gammaUrl: settings.polymarketGammaUrl,
   clobUrl: settings.polymarketClobUrl,
@@ -33,7 +26,6 @@ export const polymarket = createPolymarketExchange({
 const ALL: Record<ExchangeName, Exchange> = {
   bayse,
   kalshi,
-  "kalshi-multi": kalshiMulti,
   polymarket,
 };
 
