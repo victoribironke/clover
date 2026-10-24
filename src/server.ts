@@ -2,7 +2,7 @@ import { webhookCallback } from "grammy";
 import { config } from "@/config.ts";
 import { bayse, exchanges, getExchange, isExchangeName } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
-import { runStudy } from "@/jobs/study.ts";
+import { runSpeedTest } from "@/jobs/speed.ts";
 import { runDailySummary } from "@/jobs/summary.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
@@ -83,10 +83,11 @@ export const startServer = () =>
           });
         },
       },
-      "/jobs/study": {
+      // the speed test, every minute (src/speed/record.ts)
+      "/jobs/speed": {
         POST: (request) =>
           authorizedCron(request)
-            ? runJob("study", () => runStudy(bayse))
+            ? runJob("speed test", runSpeedTest)
             : new Response("unauthorized", { status: 401 }),
       },
       "/jobs/summary": {
