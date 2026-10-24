@@ -1,8 +1,8 @@
 import { config } from "@/config.ts";
 import { releaseHeldLocks } from "@/db/kv.ts";
-import { bayse, exchanges, kalshi, kalshiMulti, polymarket } from "@/exchanges/index.ts";
+import { bayse, exchanges, kalshi, polymarket } from "@/exchanges/index.ts";
 import { runScanAndReport } from "@/jobs/scan.ts";
-import { runStudy } from "@/jobs/study.ts";
+import { runSpeedTest } from "@/jobs/speed.ts";
 import { runTick } from "@/jobs/tick.ts";
 import { errorMessage, log } from "@/lib/logger.ts";
 import { startServer } from "@/server.ts";
@@ -64,8 +64,8 @@ const main = async () => {
     { command: "summary", description: "The last 24 hours" },
     { command: "results", description: "All-time results and accuracy" },
     { command: "bets", description: "Pending and open bets" },
+    { command: "speed", description: "Speed test so far" },
     { command: "scan", description: "Run a scan now" },
-    { command: "study", description: "Late-price study and void rates" },
     { command: "pause", description: "Stop scanning and placing" },
     { command: "resume", description: "Start again" },
   ]);
@@ -79,6 +79,7 @@ const main = async () => {
     for (const exchange of exchanges) {
       every(settings.tickEveryMinutes, `tick ${exchange.name}`, () => runTick(exchange))();
     }
+    every(1, "speed test", runSpeedTest)();
     if (exchanges.includes(bayse)) {
       every(settings.scanEveryMinutes, "scan bayse", () => runScanAndReport(bayse))();
     }
@@ -87,17 +88,11 @@ const main = async () => {
         queueWeatherScan(() => runScanAndReport(kalshi)),
       )();
     }
-    if (exchanges.includes(kalshiMulti)) {
-      every(settings.kalshiScanEveryMinutes, "scan kalshi-multi", () =>
-        queueWeatherScan(() => runScanAndReport(kalshiMulti)),
-      )();
-    }
     if (exchanges.includes(polymarket)) {
       every(settings.polymarketScanEveryMinutes, "scan polymarket", () =>
         queueWeatherScan(() => runScanAndReport(polymarket)),
       )();
     }
-    every(settings.studyEveryMinutes, "study", () => runStudy(bayse))();
   }
 };
 
