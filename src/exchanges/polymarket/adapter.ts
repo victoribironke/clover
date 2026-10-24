@@ -341,9 +341,6 @@ export const createPolymarketExchange = ({
     );
   };
 
-  const unsupported = () =>
-    Promise.reject(new Error("Polymarket: the late-price study only runs on Bayse"));
-
   return {
     name: "polymarket",
     canTrade: false,
@@ -357,7 +354,5 @@ export const createPolymarketExchange = ({
     findOrders: paperOnly,
     getAvailableBalance: paperOnly,
     getWallet: paperOnly,
-    listSettledEvents: unsupported,
-    priceHistory: unsupported,
   };
 };
