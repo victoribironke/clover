@@ -47,11 +47,7 @@ export type RawOrderbook = {
 
 type FetchJson = <T>(path: string) => Promise<T>;
 
-type KalshiName = "kalshi" | "kalshi-multi";
-
 export type KalshiOptions = {
-  // "kalshi-multi": the same markets on a second paper account, priced by another model
-  name?: KalshiName;
   baseUrl: string;
   // series tickers to scan, e.g. "KXHIGHNY"
   series: readonly string[];
@@ -138,15 +134,11 @@ const eventStatus = (markets: Market[]): EventStatus => {
   return "closed";
 };
 
-export const toEvent = (
-  event: RawKalshiEvent,
-  rawMarkets: RawKalshiMarket[],
-  exchange: KalshiName = "kalshi",
-): MarketEvent => {
+export const toEvent = (event: RawKalshiEvent, rawMarkets: RawKalshiMarket[]): MarketEvent => {
   const markets = rawMarkets.map(toMarket);
   const first = rawMarkets[0];
   return {
-    exchange,
+    exchange: "kalshi",
     id: event.event_ticker,
     // the series ticker: Kalshi's public pages are per series
     slug: event.series_ticker,
@@ -221,7 +213,6 @@ export const walkBook = (bids: [string, string][], amount: number, feeRate: numb
 const paperOnly = () => Promise.reject(new Error("Kalshi is paper-only: no account is connected"));
 
 export const createKalshiExchange = ({
-  name = "kalshi",
   baseUrl,
   series,
   feeRate = 0.07,
@@ -251,8 +242,7 @@ export const createKalshiExchange = ({
       const page = await get<{ events?: RawKalshiEvent[] }>(
         `/events?series_ticker=${encodeURIComponent(ticker)}&status=open&with_nested_markets=true&limit=10`,
       );
-      for (const event of page.events ?? [])
-        events.push(toEvent(event, event.markets ?? [], name));
+      for (const event of page.events ?? []) events.push(toEvent(event, event.markets ?? []));
       await Bun.sleep(250);
     }
     return events;
@@ -265,7 +255,7 @@ export const createKalshiExchange = ({
       `/events/${encodeURIComponent(eventId)}`,
     );
     const markets = result.markets?.length ? result.markets : (result.event.markets ?? []);
-    return toEvent(result.event, markets, name);
+    return toEvent(result.event, markets);
   };
 
   const loadBook = async (marketId: string) => {
@@ -297,11 +287,8 @@ export const createKalshiExchange = ({
     return requests.map((request) => walkBook(bids, request.amount, feeRate));
   };
 
-  const unsupported = () =>
-    Promise.reject(new Error("Kalshi: the late-price study only runs on Bayse"));
-
   return {
-    name,
+    name: "kalshi",
     canTrade: false,
     currency: "USD",
     payoutPerShare: 1,
@@ -313,7 +300,5 @@ export const createKalshiExchange = ({
     findOrders: paperOnly,
     getAvailableBalance: paperOnly,
     getWallet: paperOnly,
-    listSettledEvents: unsupported,
-    priceHistory: unsupported,
   };
 };
