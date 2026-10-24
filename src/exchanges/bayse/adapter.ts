@@ -247,47 +247,6 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
       .map(toPlacedOrder);
   };
 
-  // Bayse lists settled events roughly newest first (checked 2026-09-25), so page until a whole
-  // page is older than `since`; a page cap guards against that ordering ever changing.
-  const listSettledEvents: Exchange["listSettledEvents"] = async (status, since) => {
-    const events: MarketEvent[] = [];
-    const cutoff = since.getTime();
-    const settledAt = (event: MarketEvent) =>
-      Date.parse(event.resolvedAt ?? event.resolutionDate ?? event.closingDate ?? "") || 0;
-    for (let page = 1; page <= 100; page++) {
-      const result = await http.request<RawEventsPage>("GET", "/v1/pm/events", {
-        auth: "read",
-        query: { status, currency: CURRENCY, page, size: PAGE_SIZE },
-      });
-      const batch = result.events.map(toEvent);
-      events.push(...batch.filter((event) => settledAt(event) >= cutoff));
-      if (batch.every((event) => settledAt(event) < cutoff) || page >= result.pagination.lastPage)
-        break;
-    }
-    return events;
-  };
-
-  // The live response is { markets: [{ marketId, priceHistory: [{ e: epochMs, p: price }] }] },
-  // not the map shown in the docs. 12H gives 1-minute points.
-  const priceHistory: Exchange["priceHistory"] = async (eventId) => {
-    const result = await http.request<{
-      markets?: { marketId: string; priceHistory?: { e: number; p: number }[] }[];
-    }>("GET", `/v1/pm/events/${eventId}/price-history`, {
-      auth: "read",
-      query: { timePeriod: "12H" },
-    });
-    return Object.fromEntries(
-      (result.markets ?? []).map((market) => [
-        market.marketId,
-        (market.priceHistory ?? [])
-          // order-book markets with no trades report p = 0 ("no last trade"), not a real 0% price
-          .filter((point) => point.p > 0 && point.p < 1)
-          .map((point) => ({ t: point.e, p: point.p }))
-          .sort((a, b) => a.t - b.t),
-      ]),
-    );
-  };
-
   // https://docs.bayse.markets/api-reference/wallet/get-assets
   const getWallet: Exchange["getWallet"] = async () => {
     const { assets } = await http.request<RawAssets>("GET", "/v1/wallet/assets", { auth: "read" });
@@ -309,7 +268,5 @@ export const createBayseExchange = (options: BayseHttpOptions): Exchange => {
     findOrders,
     getAvailableBalance,
     getWallet,
-    listSettledEvents,
-    priceHistory,
   };
 };
